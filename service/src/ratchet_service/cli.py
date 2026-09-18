@@ -19,6 +19,7 @@ def main(argv: list[str] | None = None) -> int:
     p_build = sub.add_parser("build", help="生成交付目录：报告 + 策略 + sha256 清单")
     p_build.add_argument("--dir", required=True, help="交付目录")
     p_build.add_argument("--policy", default="", help="策略 JSON（给了就渲染报告并一起交付）")
+    p_build.add_argument("--bundle", default="", help="同时产出分享包 JSON（收货方拖进验证页即可）")
     p_build.add_argument("--note", default="", help="写进清单的一句话说明")
 
     p_verify = sub.add_parser("verify", help="校验交付目录")
@@ -43,6 +44,10 @@ def main(argv: list[str] | None = None) -> int:
         for a in m["artifacts"]:
             print(f"    {a['file']}  {a['bytes']} 字节")
         print("  收货方验证：python3 verify.py <目录>（不需要装任何东西）")
+        if args.bundle:
+            path = bundle(d, Path(args.bundle))
+            print(f"  分享包：{path}")
+            print("    收货方把它拖进验证页即可——不需要账号、不需要装东西、不需要服务端。")
         return 0
 
     if args.cmd == "verify":
