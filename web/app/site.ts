@@ -25,7 +25,7 @@ export const site = {
    *   curl -fsSL <installUrl>/install.sh | sh
    * 产物由 `make dist` 生成，把 dist/ 与 install.sh 放在同一个目录即可。
    */
-  installUrl: '',
+  installUrl: 'https://github.com/suhui-organization/ratchet/releases/latest/download',
   /** 无下载地址时的联系入口。 */
   contactUrl: 'mailto:ratchet@example.com?subject=Ratchet%20access',
   /** 源码获取方式（仓库暂不公开，写清楚而不是留假链接）。 */
