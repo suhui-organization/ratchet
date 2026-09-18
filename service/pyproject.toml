@@ -1,0 +1,20 @@
+[project]
+name = "ratchet-service"
+version = "0.1.0"
+description = "Ratchet 交付物侧：sha256 清单、合规映射、以及只用标准库的独立验证器"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+dependencies = []
+
+[project.scripts]
+ratchet-report = "ratchet_service.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

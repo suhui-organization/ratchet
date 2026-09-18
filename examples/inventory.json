@@ -1,0 +1,15 @@
+{
+  "format": "ratchet-inventory/v1",
+  "agent": "codex",
+  "tools": [
+    { "server": "filesystem", "tool": "read_file", "description": "Read a file from disk", "calls": 120 },
+    { "server": "filesystem", "tool": "list_directory", "description": "List entries in a directory", "calls": 64 },
+    { "server": "filesystem", "tool": "search_files", "description": "Search for files by name", "calls": 12 },
+    { "server": "filesystem", "tool": "write_file", "description": "Write contents to a file", "calls": 9 },
+    { "server": "filesystem", "tool": "delete_file", "description": "Delete a file", "calls": 1 },
+    { "server": "github", "tool": "get_issue", "description": "Fetch a single issue" },
+    { "server": "github", "tool": "create_pull_request", "description": "Open a pull request", "calls": 3 },
+    { "server": "shell", "tool": "execute_command", "description": "Run a shell command", "calls": 17 },
+    { "server": "internal", "tool": "acme_opaque_thing", "description": "Does an internal thing" }
+  ]
+}

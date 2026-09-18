@@ -1,0 +1,10 @@
+@import "tailwindcss";
+
+/* 克制的中性色：这是一份要看的证据，不是要打动人的落地页 */
+:root {
+  color-scheme: light;
+}
+
+body {
+  @apply bg-slate-50 text-slate-800 antialiased;
+}

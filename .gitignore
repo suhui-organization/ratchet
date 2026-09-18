@@ -1,0 +1,20 @@
+# Go
+/bin/
+*.test
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+.pytest_cache/
+
+# Node / Nuxt
+node_modules/
+.nuxt/
+.output/
+dist/
+*.tsbuildinfo
+
+# 交付物（本地生成，不进仓库）
+/delivery/
