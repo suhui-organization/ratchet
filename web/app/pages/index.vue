@@ -85,15 +85,28 @@ const limits = [
         </div>
       </div>
 
-      <figure class="rise rise-2 overflow-hidden rounded-lg border border-ink-800 bg-ink-900 shadow-[0_24px_60px_-30px_rgba(0,0,0,0.95)]">
-        <div class="flex items-center gap-2 border-b border-ink-800 px-4 py-2.5">
-          <span class="h-2.5 w-2.5 rounded-full bg-ink-700"></span>
-          <span class="h-2.5 w-2.5 rounded-full bg-ink-800"></span>
-          <span class="ml-2 font-mono text-[11px] text-ink-400">ratchet — static scan, executes nothing</span>
-        </div>
-        <pre class="overflow-x-auto px-4 py-4 font-mono text-[11.5px] leading-[1.9]"><code><span
-          v-for="(l, i) in scanLines" :key="i" class="block whitespace-pre"
-          :class="l.c === 'cmd' ? 'text-ink-050' : l.c === 'flag' ? 'text-flag' : 'text-ink-400'">{{ l.t }}</span></code></pre>
+      <!-- 真机截图：1280×900 的原始运行输出，不是重画的示意图 -->
+      <figure class="rise rise-2">
+        <img
+          src="/shots/scan.jpg" width="1280" height="900" loading="eager" decoding="async"
+          alt="ratchet scan output: 16 MCP servers found, 12 unpinned, with package names listed in orange"
+          class="w-full rounded-lg border border-ink-800 shadow-[0_24px_60px_-30px_rgba(0,0,0,0.95)]"
+        />
+      </figure>
+    </section>
+
+    <!-- 第二个真机截图：编译产物长什么样 -->
+    <section class="mx-auto max-w-6xl px-6 pb-20">
+      <figure>
+        <img
+          src="/shots/policy.jpg" width="1280" height="900" loading="lazy" decoding="async"
+          alt="ratchet policy draft output: three tools resolved to allow and approve, each with the reason it was decided that way"
+          class="w-full rounded-lg border border-ink-800 shadow-[0_24px_60px_-30px_rgba(0,0,0,0.95)]"
+        />
+        <figcaption class="mt-3 text-[13px] text-ink-400">
+          One command turns the surface into a policy. Every verdict carries the reason it was made —
+          and the tools that were never called don't make it in at all.
+        </figcaption>
       </figure>
     </section>
 
@@ -162,32 +175,12 @@ const limits = [
           </NuxtLink>
         </div>
 
-        <figure class="overflow-hidden rounded-lg border border-ink-800 bg-ink-950 shadow-[0_24px_60px_-30px_rgba(0,0,0,0.95)]">
-          <div class="flex items-center gap-3 border-b border-ink-800 px-5 py-4">
-            <span class="grid h-6 w-6 place-items-center rounded-full bg-pass/15">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" class="h-3.5 w-3.5 text-pass">
-                <path d="M5 12.5 10 17.5 19 7" stroke-linecap="round" stroke-linejoin="round" />
-              </svg>
-            </span>
-            <div>
-              <p class="text-sm text-ink-050">Verification passed</p>
-              <p class="text-[12px] text-ink-400">2 files match manifest.json</p>
-            </div>
-            <span class="ml-auto font-mono text-[11px] text-ink-700">/verify</span>
-          </div>
-          <table class="w-full font-mono text-[11.5px]">
-            <tbody>
-              <tr v-for="row in verifyRows" :key="row.file" class="border-b border-ink-900 last:border-0">
-                <td class="px-5 py-3 text-ink-200">{{ row.file }}</td>
-                <td class="tnum px-5 py-3 text-ink-700">{{ row.digest }}</td>
-                <td class="px-5 py-3 text-right">
-                  <span :class="row.state === 'ok' ? 'text-pass' : 'text-ink-400'">
-                    {{ row.state === 'ok' ? 'match' : 'not in bundle' }}
-                  </span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <figure>
+          <img
+            src="/shots/verify.jpg" width="1280" height="900" loading="lazy" decoding="async"
+            alt="The verifier page: a green 'Verification passed' bar and a table of three files with match / not in bundle verdicts"
+            class="w-full rounded-lg border border-ink-800 shadow-[0_24px_60px_-30px_rgba(0,0,0,0.95)]"
+          />
         </figure>
       </div>
     </section>
