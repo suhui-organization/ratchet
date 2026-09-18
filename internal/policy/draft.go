@@ -19,6 +19,10 @@ const (
 type Options struct {
 	// StrictUnknown 把无法判定能力的工具判为 deny（默认 approve + 待确认）。
 	StrictUnknown bool
+	// OnlyObserved 只授予**被观测到调用过**的工具。
+	// 这是最小权限最严格的一档：配置里挂着但从未用过的工具不进策略
+	// （未登记的工具默认被拒绝，所以它们等于被收掉了）。
+	OnlyObserved bool
 	// Agent 覆盖清单里的 agent 名。
 	Agent string
 	// Now 注入时间，便于测试产出稳定输出。
@@ -73,6 +77,10 @@ func Draft(inv model.Inventory, opts Options) model.Policy {
 	entries := make([]entry, 0, len(keys))
 	for _, key := range keys {
 		t := merged[key]
+		// 最小权限的字面含义：不授予没有观察到的能力。
+		if opts.OnlyObserved && t.Calls == 0 {
+			continue
+		}
 		cap, reason := Classify(t)
 		dec, review := Decide(cap, opts.StrictUnknown)
 		// 观测到的调用次数是有用的上下文：写进依据里，报告和界面都要显示

@@ -18,10 +18,11 @@ import (
 	"github.com/suhui-organization/ratchet/internal/discover"
 	"github.com/suhui-organization/ratchet/internal/mcp"
 	"github.com/suhui-organization/ratchet/internal/model"
+	"github.com/suhui-organization/ratchet/internal/observe"
 	"github.com/suhui-organization/ratchet/internal/policy"
 )
 
-const version = "0.1.0"
+const version = "0.3.0"
 
 // InventoryFormat 是本工具认识的清单格式标识。
 const InventoryFormat = "ratchet-inventory/v1"
@@ -38,6 +39,8 @@ func main() {
 		os.Exit(cmdPolicy(os.Args[2:]))
 	case "scan":
 		os.Exit(cmdScan(os.Args[2:]))
+	case "observe":
+		os.Exit(cmdObserve(os.Args[2:]))
 	case "help", "--help", "-h":
 		usage()
 	default:
@@ -54,8 +57,10 @@ func usage() {
   ratchet version
   ratchet scan [--home <dir>] [--workdir <dir>] [--introspect]
                [--out <清单.json>] [--timeout <秒>] [--json]
+  ratchet observe --calls <调用记录.jsonl> [--inventory <清单.json>]
+                  [--out <清单.json>] [--json]
   ratchet policy draft --from <清单.json> [--out <策略.json>]
-                       [--agent <名字>] [--strict-unknown] [--json]
+                       [--agent <名字>] [--strict-unknown] [--only-observed] [--json]
 
 说明：
   scan          只读本机配置，列出装了哪些 agent、挂了哪些 MCP server。
@@ -65,9 +70,126 @@ func usage() {
   policy draft  读工具清单，编译出最小权限策略；每条判定都带依据。
                 未登记的工具一律拒绝；无法判定能力的默认置为 approve 并列入待确认。
 
+  observe       把真实调用记录对到清单上：哪些在用、哪些从未被用过、
+                哪些**不在清单里却被调用过**（清单不全或有人绕过配置）。
+
   --strict-unknown  无法判定能力的工具直接 deny（默认是 approve + 待确认）
+  --only-observed   只授予被观测到调用过的工具（最小权限最严格的一档）
   --json            把策略 JSON 打到 stdout（不给 --out 时也能用管道接）
 `)
+}
+
+func cmdObserve(args []string) int {
+	fs := flag.NewFlagSet("observe", flag.ContinueOnError)
+	calls := fs.String("calls", "", "调用记录 JSONL（必填；每行 {server, tool, ...}）")
+	invPath := fs.String("inventory", "", "工具清单（给了就做能力面 vs 使用面的比对）")
+	out := fs.String("out", "", "把调用次数写回清单并输出到该文件")
+	asJSON := fs.Bool("json", false, "输出 JSON")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if *calls == "" {
+		fmt.Fprintln(os.Stderr, "缺少 --calls：需要一份调用记录（JSONL，每行一次调用）")
+		return 2
+	}
+
+	summary, err := observe.ReadCallsFile(*calls)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "读取调用记录失败：%v\n", err)
+		return 1
+	}
+	if err := observe.Validate(summary); err != nil {
+		fmt.Fprintf(os.Stderr, "调用记录不可用：%v\n", err)
+		return 1
+	}
+
+	var inv model.Inventory
+	if *invPath != "" {
+		inv, err = loadInventory(*invPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "读取清单失败：%v\n", err)
+			return 1
+		}
+	}
+
+	withCalls := observe.Apply(inv, summary)
+	var cmp *observe.Comparison
+	if *invPath != "" {
+		c := observe.Compare(inv, summary)
+		cmp = &c
+	}
+
+	if *out != "" {
+		if err := writeJSON(*out, withCalls); err != nil {
+			fmt.Fprintf(os.Stderr, "写出清单失败：%v\n", err)
+			return 1
+		}
+	}
+
+	if *asJSON {
+		payload := map[string]any{"summary": summary}
+		if cmp != nil {
+			payload["comparison"] = cmp
+		}
+		if *out != "" {
+			payload["inventory"] = withCalls
+		}
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		enc.SetEscapeHTML(false)
+		if err := enc.Encode(payload); err != nil {
+			fmt.Fprintf(os.Stderr, "输出 JSON 失败：%v\n", err)
+			return 1
+		}
+		return 0
+	}
+	renderObserve(os.Stdout, summary, cmp, *out, len(withCalls.Tools))
+	return 0
+}
+
+func renderObserve(w *os.File, s observe.Summary, cmp *observe.Comparison, out string, tools int) {
+	fmt.Fprintf(w, "ratchet %s — 观测到的调用\n\n", version)
+	fmt.Fprintf(w, "  调用记录  %d 条\n", s.Total)
+	if s.Skipped > 0 {
+		fmt.Fprintf(w, "  跳过      %d 行（无法解析或缺字段）\n", s.Skipped)
+	}
+	fmt.Fprintf(w, "  涉及工具  %d 个\n", len(s.Counts))
+
+	if cmp == nil {
+		if out != "" {
+			fmt.Fprintf(w, "\n清单已写出：%s（%d 个工具）\n", out, tools)
+		}
+		fmt.Fprintln(w, "\n下一步：加 --inventory <清单.json> 就能看出哪些工具从未被用过。")
+		return
+	}
+
+	fmt.Fprintf(w, "\n  清单里      %d 个工具\n", len(cmp.Called)+len(cmp.Unused))
+	fmt.Fprintf(w, "  被调用过    %d\n", len(cmp.Called))
+	fmt.Fprintf(w, "  从未被调用  %d  ← 最小权限下这些应该被收掉\n", len(cmp.Unused))
+	if len(cmp.Unknown) > 0 {
+		fmt.Fprintf(w, "  清单之外    %d  ⚠ 被调用过但不在清单里：要么扫描漏了，要么有人绕过了配置\n", len(cmp.Unknown))
+	}
+
+	if len(cmp.Unused) > 0 {
+		fmt.Fprintln(w, "\n从未被调用的工具（按最小权限应当移除）")
+		for _, key := range cmp.Unused {
+			fmt.Fprintf(w, "  %s\n", key)
+		}
+	}
+	if len(cmp.Unknown) > 0 {
+		fmt.Fprintln(w, "\n清单之外的调用（先查清来源，再决定是补清单还是堵绕过）")
+		for _, key := range cmp.Unknown {
+			fmt.Fprintf(w, "  %-34s %d 次\n", key, cmp.Counts[key])
+		}
+	}
+	if out != "" {
+		fmt.Fprintf(w, "\n带调用次数的清单已写出：%s\n", out)
+	}
+	fmt.Fprintln(w, "\n下一步（最严格的一档：只授予观测到的东西）")
+	if out == "" {
+		out = "<清单.json>"
+	}
+	fmt.Fprintf(w, "  ratchet policy draft --from %s --only-observed --out policy.json\n", out)
 }
 
 func cmdScan(args []string) int {
@@ -270,6 +392,7 @@ func cmdPolicy(args []string) int {
 	out := fs.String("out", "", "策略输出路径（不给则只打印摘要）")
 	agent := fs.String("agent", "", "覆盖清单里的 agent 名")
 	strict := fs.Bool("strict-unknown", false, "无法判定能力的工具直接 deny")
+	onlyObserved := fs.Bool("only-observed", false, "只授予被观测到调用过的工具")
 	asJSON := fs.Bool("json", false, "把策略 JSON 打到 stdout")
 	if err := fs.Parse(args[1:]); err != nil {
 		return 2
@@ -285,7 +408,11 @@ func cmdPolicy(args []string) int {
 		return 1
 	}
 
-	p := policy.Draft(inv, policy.Options{StrictUnknown: *strict, Agent: *agent})
+	p := policy.Draft(inv, policy.Options{
+		StrictUnknown: *strict,
+		OnlyObserved:  *onlyObserved,
+		Agent:         *agent,
+	})
 
 	if *out != "" {
 		if err := writeJSON(*out, p); err != nil {
