@@ -13,7 +13,10 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"time"
 
+	"github.com/suhui-organization/ratchet/internal/discover"
+	"github.com/suhui-organization/ratchet/internal/mcp"
 	"github.com/suhui-organization/ratchet/internal/model"
 	"github.com/suhui-organization/ratchet/internal/policy"
 )
@@ -33,6 +36,8 @@ func main() {
 		fmt.Printf("ratchet %s\n", version)
 	case "policy":
 		os.Exit(cmdPolicy(os.Args[2:]))
+	case "scan":
+		os.Exit(cmdScan(os.Args[2:]))
 	case "help", "--help", "-h":
 		usage()
 	default:
@@ -47,16 +52,212 @@ func usage() {
 
 用法：
   ratchet version
+  ratchet scan [--home <dir>] [--workdir <dir>] [--introspect]
+               [--out <清单.json>] [--timeout <秒>] [--json]
   ratchet policy draft --from <清单.json> [--out <策略.json>]
                        [--agent <名字>] [--strict-unknown] [--json]
 
 说明：
+  scan          只读本机配置，列出装了哪些 agent、挂了哪些 MCP server。
+                默认**不执行任何东西**；加 --introspect 才会连上 server 取工具名
+                （连上就会执行配置里写的命令，所以必须显式开启）。
+
   policy draft  读工具清单，编译出最小权限策略；每条判定都带依据。
                 未登记的工具一律拒绝；无法判定能力的默认置为 approve 并列入待确认。
 
   --strict-unknown  无法判定能力的工具直接 deny（默认是 approve + 待确认）
   --json            把策略 JSON 打到 stdout（不给 --out 时也能用管道接）
 `)
+}
+
+func cmdScan(args []string) int {
+	fs := flag.NewFlagSet("scan", flag.ContinueOnError)
+	home := fs.String("home", "", "扫描哪个 HOME（默认当前用户的）")
+	work := fs.String("workdir", "", "项目级配置所在目录（默认当前目录）")
+	introspect := fs.Bool("introspect", false, "连上每个 server 取工具名（会执行配置里的命令）")
+	out := fs.String("out", "", "把清单写到这个文件（需要 --introspect）")
+	timeout := fs.Int("timeout", 20, "单个 server 的 introspect 超时（秒）")
+	asJSON := fs.Bool("json", false, "把扫描报告打成 JSON")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+
+	if *home == "" {
+		if h, err := os.UserHomeDir(); err == nil {
+			*home = h
+		} else {
+			fmt.Fprintf(os.Stderr, "无法确定 HOME：%v\n", err)
+			return 1
+		}
+	}
+	if *work == "" {
+		if wd, err := os.Getwd(); err == nil {
+			*work = wd
+		}
+	}
+	if *out != "" && !*introspect {
+		// 静态扫描只知道 server，不知道工具名。这一点必须讲清楚，
+		// 否则用户会以为"没报错就是没问题"，实际上清单是空的。
+		fmt.Fprintln(os.Stderr, "静态扫描只知道有哪些 server，不知道它们暴露了哪些工具。")
+		fmt.Fprintln(os.Stderr, "要生成可编译的清单，请加 --introspect（会执行配置里写的命令）。")
+		return 2
+	}
+
+	report := discover.Scan(*home, *work)
+
+	var inv model.Inventory
+	failures := map[string]string{}
+	if *introspect {
+		inv = model.Inventory{Format: InventoryFormat, Agent: primaryHarness(report)}
+		for _, h := range report.Harnesses {
+			for _, s := range h.Servers {
+				tools, err := mcp.ListTools(mcp.Options{
+					Command: s.Command,
+					Args:    s.Args,
+					Env:     os.Environ(),
+					Timeout: time.Duration(*timeout) * time.Second,
+				})
+				if err != nil {
+					// 连不上与"没有工具"是两件事，必须分别记录
+					failures[h.ID+"/"+s.Name] = err.Error()
+					continue
+				}
+				for _, tool := range tools {
+					inv.Tools = append(inv.Tools, model.ToolObservation{
+						Server:      s.Name,
+						Tool:        tool.Name,
+						Description: tool.Description,
+					})
+				}
+			}
+		}
+	}
+
+	if *asJSON {
+		payload := map[string]any{"scan": report, "introspect_failures": failures}
+		if *introspect {
+			payload["inventory"] = inv
+		}
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		enc.SetEscapeHTML(false)
+		if err := enc.Encode(payload); err != nil {
+			fmt.Fprintf(os.Stderr, "输出 JSON 失败：%v\n", err)
+			return 1
+		}
+	} else {
+		renderScan(os.Stdout, report, inv, failures, *introspect)
+	}
+
+	if *out != "" {
+		if len(inv.Tools) == 0 {
+			// 一份没有工具的清单会让 policy draft 直接报错；这里先讲清楚原因。
+			fmt.Fprintln(os.Stderr, "没有取到任何工具，不写清单——检查上面的失败原因。")
+			return 1
+		}
+		if err := writeJSON(*out, inv); err != nil {
+			fmt.Fprintf(os.Stderr, "写入清单失败：%v\n", err)
+			return 1
+		}
+		if !*asJSON {
+			fmt.Fprintf(os.Stdout, "\n清单已写出：%s（%d 个工具）\n", *out, len(inv.Tools))
+			fmt.Fprintf(os.Stdout, "下一步：ratchet policy draft --from %s --out policy.json\n", *out)
+		}
+	}
+	return 0
+}
+
+// primaryHarness 取第一个被解析的 harness 作为清单里的 agent 名。
+// 多 harness 环境下这是近似值，报告里会显示全部，用户可自行覆盖。
+func primaryHarness(r discover.Report) string {
+	for _, h := range r.Harnesses {
+		if h.Parsed && len(h.Servers) > 0 {
+			return h.ID
+		}
+	}
+	return ""
+}
+
+func renderScan(w *os.File, r discover.Report, inv model.Inventory, failures map[string]string, introspected bool) {
+	servers := 0
+	for _, h := range r.Harnesses {
+		servers += len(h.Servers)
+	}
+	parsed := 0
+	for _, h := range r.Harnesses {
+		if h.Parsed {
+			parsed++
+		}
+	}
+	fmt.Fprintf(w, "ratchet %s — 本机 agent 与 MCP server 扫描（只读，不执行任何东西）\n\n", version)
+	fmt.Fprintf(w, "  HOME      %s\n", r.Home)
+	fmt.Fprintf(w, "  harness   %d（已解析 %d）\n", len(r.Harnesses), parsed)
+	fmt.Fprintf(w, "  server    %d\n", servers)
+	if unpinned := r.Unpinned(); len(unpinned) > 0 {
+		fmt.Fprintf(w, "  未锁版本  %d（同名包被替换时无法察觉）\n", len(unpinned))
+	}
+
+	if len(r.Harnesses) == 0 {
+		fmt.Fprintln(w, "\n没有发现任何 agent 配置。")
+		return
+	}
+
+	fmt.Fprintln(w, "\n按 harness")
+	for _, h := range r.Harnesses {
+		note := ""
+		if !h.Parsed {
+			note = "（配置格式不认识，这里可能还有我们看不到的 server）"
+		}
+		fmt.Fprintf(w, "  %-12s %-16s %d 个 server %s\n", h.ID, h.Name, len(h.Servers), note)
+		for _, s := range h.Servers {
+			fmt.Fprintf(w, "      %-18s %s %s\n", s.Name, serverDesc(s), riskMark(s))
+		}
+	}
+
+	if len(r.Unparsed) > 0 {
+		fmt.Fprintln(w, "\n未解析的配置")
+		for _, u := range r.Unparsed {
+			fmt.Fprintf(w, "  %s\n", u)
+		}
+	}
+
+	if introspected {
+		fmt.Fprintln(w, "\nintrospect 结果（已实际连接 server）")
+		if len(inv.Tools) == 0 && len(failures) == 0 {
+			fmt.Fprintln(w, "  没有可连接的 server")
+		}
+		if len(inv.Tools) > 0 {
+			fmt.Fprintf(w, "  取到工具 %d 个\n", len(inv.Tools))
+		}
+		keys := make([]string, 0, len(failures))
+		for k := range failures {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			fmt.Fprintf(w, "  ⚠ %s 连接失败：%s\n", k, failures[k])
+		}
+		fmt.Fprintln(w, "  注意：连接失败的 server 不在清单里——它们的能力面是未知的，不要当成没有风险。")
+	} else {
+		fmt.Fprintln(w, "\n下一步")
+		fmt.Fprintln(w, "  加 --introspect 连上这些 server 取工具名，才能编译出策略：")
+		fmt.Fprintln(w, "    ratchet scan --introspect --out inventory.json")
+	}
+}
+
+func serverDesc(s discover.Server) string {
+	if s.URL != "" {
+		return "remote " + s.URL
+	}
+	parts := append([]string{s.Command}, s.Args...)
+	return strings.Join(parts, " ")
+}
+
+func riskMark(s discover.Server) string {
+	if s.Risk == "" {
+		return ""
+	}
+	return "⚠ " + s.Risk
 }
 
 func cmdPolicy(args []string) int {

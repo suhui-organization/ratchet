@@ -23,7 +23,9 @@
 | 1.2 | 能力判定（名称/描述 → 破坏性/执行/写入/出网/读取/未知） | ✅ |
 | 1.3 | `ratchet policy draft --from <清单>` 输出策略 + 判定依据 | ✅ |
 | 1.4 | 确定性：同一输入必须产出同一策略（可 diff、可进版本控制） | ✅ 有测试 |
-| 1.5 | **真实扫描**：读 harness 配置 + MCP `tools/list` 生成清单 | ⏳ 下一阶段 |
+| 1.5 | **真实扫描**：读 harness 配置 + MCP `tools/list` 生成清单 | ✅ 见 [DELIVERY-0.2.0](DELIVERY-0.2.0.md) |
+| 1.6 | 更多 harness 方言 + 远程 server 的 introspect | ⏳ |
+| 1.7 | 用审计日志填 `calls`（区分"用过的"与"只存在的"） | ⏳ |
 
 ### P2 · 交付物（下一步）
 
