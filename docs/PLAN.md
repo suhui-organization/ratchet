@@ -36,8 +36,9 @@
 | 2.1 | sha256 清单（`manifest.json`） | ✅ |
 | 2.2 | 合规映射（EU AI Act Art.11/12/14/15/17 + ISO 42001） | ✅ |
 | 2.3 | 单文件独立验证器（只用 Python 标准库） | ✅ |
-| 2.4 | 报告渲染（Markdown，含覆盖边界章节） | ⏳ |
-| 2.5 | `ratchet-report build` 一键出交付目录 | ⏳ |
+| 2.4 | 报告渲染（四节 + 合规映射） | ✅ 见 [DELIVERY-0.5.0](DELIVERY-0.5.0.md) |
+| 2.5 | `ratchet-report build` 一键出交付目录 | ✅ |
+| 2.6 | 交付目录里放验证器副本 | ⏳ |
 
 ### P3 · 验证页与分享
 
