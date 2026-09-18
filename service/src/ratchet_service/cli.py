@@ -9,6 +9,7 @@ from pathlib import Path
 import shutil
 
 from . import compliance, manifest, report
+from .i18n import resolve_locale
 from .verify import MESSAGES, render
 
 
@@ -20,6 +21,7 @@ def main(argv: list[str] | None = None) -> int:
     p_build.add_argument("--dir", required=True, help="交付目录")
     p_build.add_argument("--policy", default="", help="策略 JSON（给了就渲染报告并一起交付）")
     p_build.add_argument("--bundle", default="", help="同时产出分享包 JSON（收货方拖进验证页即可）")
+    p_build.add_argument("--lang", default="", help="产物语言：en-US（默认）/ zh-CN；也可用 RATCHET_LANG")
     p_build.add_argument("--note", default="", help="写进清单的一句话说明")
 
     p_verify = sub.add_parser("verify", help="校验交付目录")
@@ -28,6 +30,7 @@ def main(argv: list[str] | None = None) -> int:
     p_verify.add_argument("--json", action="store_true")
 
     p_compliance = sub.add_parser("compliance", help="打印合规条款映射（Markdown）")
+    p_compliance.add_argument("--lang", default="", help="en-US（默认）/ zh-CN")
 
     p_bundle = sub.add_parser("bundle", help="把交付目录打成一个可分享的 JSON（收货方拖进网页即可验证）")
     p_bundle.add_argument("--dir", required=True, help="交付目录")
@@ -38,7 +41,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "build":
         d = Path(args.dir)
         d.mkdir(parents=True, exist_ok=True)
-        m = build_delivery(d, policy_path=Path(args.policy) if args.policy else None, note=args.note)
+        m = build_delivery(d, policy_path=Path(args.policy) if args.policy else None,
+                           note=args.note, lang=args.lang)
         print(f"已生成交付目录：{d}")
         print(f"  产物 {len(m['artifacts'])} 份 · 生成时间 {m['generatedAt']}")
         for a in m["artifacts"]:
@@ -57,7 +61,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0 if result["ok"] else 1
 
     if args.cmd == "compliance":
-        print(compliance.render_markdown())
+        print(compliance.render_markdown(args.lang))
         return 0
 
     if args.cmd == "bundle":
@@ -69,7 +73,13 @@ def main(argv: list[str] | None = None) -> int:
     return 2
 
 
-def build_delivery(directory: Path, *, policy_path: Path | None = None, note: str = "") -> dict:
+def build_delivery(
+    directory: Path,
+    *,
+    policy_path: Path | None = None,
+    note: str = "",
+    lang: str = "",
+) -> dict:
     """把交付目录做成一份完整的交付物：报告 + 策略 + 清单。
 
     报告由策略渲染而来（`report.render_report`），所以它天然包含判定依据与
@@ -85,11 +95,18 @@ def build_delivery(directory: Path, *, policy_path: Path | None = None, note: st
         if Path(policy_path).resolve() != target.resolve():
             shutil.copyfile(policy_path, target)
         generated_at = policy.get("generatedAt", "")
+        code = _locale_code(resolve_locale(lang))
         (directory / "report.md").write_text(
-            report.render_report(policy, generated_at=generated_at, note=note), encoding="utf-8"
+            report.render_report(policy, generated_at=generated_at, note=note, locale=code),
+            encoding="utf-8",
         )
 
     return manifest.write_manifest(directory, note=note)
+
+
+def _locale_code(locale: str) -> str:
+    """i18n 的 resolve_locale 返回 'en-US'/'zh-CN'，两者同名，这里只是留个转换点。"""
+    return locale
 
 
 def bundle(directory: Path, out: Path) -> Path:

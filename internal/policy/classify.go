@@ -6,6 +6,30 @@ import (
 	"github.com/suhui-organization/ratchet/internal/model"
 )
 
+// Locale 决定**产物里**的文字（策略文件的依据、报告）。CLI 自身的终端输出不受它影响。
+//
+// 默认 en-US：产物是给客户/审计方看的，而站点与用户群是英文。
+type Locale string
+
+const (
+	LocaleEN Locale = "en-US"
+	LocaleZH Locale = "zh-CN"
+)
+
+// ParseLocale 归一化语言标记；认不出来的一律回落到 en-US（产物面向外部读者）。
+func ParseLocale(raw string) Locale {
+	s := strings.ToLower(strings.TrimSpace(raw))
+	switch {
+	case s == "":
+		return LocaleEN
+	case strings.HasPrefix(s, "zh"), strings.Contains(s, "chinese"):
+		return LocaleZH
+	case strings.HasPrefix(s, "en"):
+		return LocaleEN
+	}
+	return LocaleEN
+}
+
 // Capability 是工具的能力类别。判定顺序即危险度顺序：
 // 一个名字同时命中多类时，**取更危险的那一类**（不允许"既能读又能删"被判成读）。
 type Capability string
@@ -104,19 +128,75 @@ func match(tokens []string, words []string) (string, bool) {
 // 先看名字，名字判不出来再看描述。两者都判不出来才算未知。
 // 依据（reason）会写进策略文件：用户要能看懂"为什么这条被收紧了"。
 func Classify(tool model.ToolObservation) (Capability, string) {
-	nameTokens := tokenize(tool.Tool)
+	cap, match := classifyMatch(tool)
+	return cap, match.describe(LocaleZH)
+}
+
+// Match 记录"依据是什么"：命中位置 + 命中的词（没命中时为空）。
+//
+// 不直接把依据拼成字符串，是因为产物要出中英两版——
+// 一旦在这一层拼成中文，翻译就只能靠字符串替换，那是必然出错的活。
+type Match struct {
+	Where string // "name" | "description" | ""
+	Word  string
+}
+
+func classifyMatch(tool model.ToolObservation) (Capability, Match) {
+	if w, ok := matchAny(tokenize(tool.Tool)); ok {
+		return capabilityOfWord(w), Match{Where: "name", Word: w}
+	}
+	if w, ok := matchAny(tokenize(tool.Description)); ok {
+		return capabilityOfWord(w), Match{Where: "description", Word: w}
+	}
+	return CapUnknown, Match{}
+}
+
+// matchAny 按危险度顺序找第一个命中的词。
+func matchAny(tokens []string) (string, bool) {
 	for _, set := range keywordSets {
-		if w, ok := match(nameTokens, set.words); ok {
-			return set.cap, "名称命中「" + w + "」"
+		if w, ok := match(tokens, set.words); ok {
+			return w, true
 		}
 	}
-	descTokens := tokenize(tool.Description)
+	return "", false
+}
+
+// capabilityOfWord 反查某个词属于哪一类。词表是唯一真相，这里不另写映射。
+func capabilityOfWord(word string) Capability {
 	for _, set := range keywordSets {
-		if w, ok := match(descTokens, set.words); ok {
-			return set.cap, "描述命中「" + w + "」"
+		for _, w := range set.words {
+			if w == word {
+				return set.cap
+			}
 		}
 	}
-	return CapUnknown, "名称与描述都未命中能力词表"
+	return CapUnknown
+}
+
+// describe 把依据渲染成一句人话。
+func (m Match) describe(loc Locale) string {
+	switch m.Where {
+	case "name":
+		if loc == LocaleZH {
+			return "名称命中「" + m.Word + "」"
+		}
+		return "name matches \"" + m.Word + "\""
+	case "description":
+		if loc == LocaleZH {
+			return "描述命中「" + m.Word + "」"
+		}
+		return "description matches \"" + m.Word + "\""
+	}
+	if loc == LocaleZH {
+		return "名称与描述都未命中能力词表"
+	}
+	return "no capability keyword in the tool name or description"
+}
+
+// DescribeFor 是外部拿依据的入口（draft 与报告都用它）。
+func DescribeFor(tool model.ToolObservation, loc Locale) string {
+	_, m := classifyMatch(tool)
+	return m.describe(loc)
 }
 
 // Decide 把能力类别映射成判定。

@@ -30,7 +30,7 @@ func sample() model.Inventory {
 func fixedNow() time.Time { return time.Date(2026, 9, 18, 12, 0, 0, 0, time.UTC) }
 
 func TestDraftBucketsAndRationale(t *testing.T) {
-	p := Draft(sample(), Options{Now: fixedNow()})
+	p := Draft(sample(), Options{Now: fixedNow(), Locale: LocaleZH})
 
 	fs := p.Servers["filesystem"]
 	if !reflect.DeepEqual(fs.Allow, []string{"list_directory", "read_file"}) {
@@ -80,7 +80,7 @@ func TestDraftDeterministic(t *testing.T) {
 }
 
 func TestDraftUnknownGoesToNeedsReview(t *testing.T) {
-	p := Draft(sample(), Options{Now: fixedNow()})
+	p := Draft(sample(), Options{Now: fixedNow(), Locale: LocaleZH})
 	if !reflect.DeepEqual(p.NeedsReview, []string{"internal/acme_opaque_thing"}) {
 		t.Fatalf("needsReview = %v", p.NeedsReview)
 	}
@@ -104,7 +104,7 @@ func TestDraftDeduplicates(t *testing.T) {
 		{Server: "s", Tool: "read_file", Calls: 1},
 		{Server: "s", Tool: "read_file", Calls: 5},
 	}}
-	p := Draft(inv, Options{Now: fixedNow()})
+	p := Draft(inv, Options{Now: fixedNow(), Locale: LocaleZH})
 	if !reflect.DeepEqual(p.Servers["s"].Allow, []string{"read_file"}) {
 		t.Fatalf("重复工具没有去重：%v", p.Servers["s"])
 	}
@@ -123,5 +123,28 @@ func TestDraftSkipsIncompleteTools(t *testing.T) {
 	_, tools, _, _, _ := Counts(p)
 	if tools != 1 {
 		t.Fatalf("缺 server/tool 的条目应被跳过，实际工具数 %d", tools)
+	}
+}
+
+func TestDraftEnglishRationale(t *testing.T) {
+	// 默认语言是 en-US：产物是给客户看的，而站点与用户群是英文。
+	// 这一条守的是"整篇英文"——依据里出现任何一个中文字符都算失败。
+	p := Draft(sample(), Options{Now: fixedNow()})
+	if r := p.Rationale["filesystem/delete_file"]; !strings.Contains(r, `name matches "delete"`) ||
+		!strings.Contains(r, "observed 1 call(s)") {
+		t.Fatalf("英文依据不对：%q", r)
+	}
+	if r := p.Rationale["github/get_issue"]; !strings.Contains(r, "never observed") {
+		t.Fatalf("未观测的英文依据不对：%q", r)
+	}
+	if r := p.Rationale["internal/acme_opaque_thing"]; !strings.Contains(r, "no capability keyword") {
+		t.Fatalf("未知工具的英文依据不对：%q", r)
+	}
+	for key, reason := range p.Rationale {
+		for _, r := range reason {
+			if r >= 0x4e00 && r <= 0x9fff {
+				t.Fatalf("%s 的依据里出现中文：%q", key, reason)
+			}
+		}
 	}
 }

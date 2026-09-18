@@ -4,65 +4,35 @@
 
 写作纪律：每一条都必须写"不能证明什么"。合规场景里，"看起来全覆盖"
 比"写清楚边界"危险得多——后者才是审计方能用的材料。
+
+措辞按语言放在 i18n 词表里（同一个条款在不同语言下必须说同样的事，
+不能各写一版，否则中英两份报告会给出不同的承诺）。
 """
 from __future__ import annotations
 
-DISCLAIMER = (
-    "它是索引，不是法律意见，也不构成合规声明——请与你的合规负责人或律师一起使用。"
-)
+from .i18n import resolve_locale, t
 
-# (条款, 本工具的产物, 能证明什么, 不能证明什么)
-MAPPING: list[tuple[str, str, str, str]] = [
-    (
-        "EU AI Act Art. 12（自动记录事件、防篡改、留存期）",
-        "manifest.json 的 sha256 清单 + `verify.py` 的独立校验结论",
-        "交付物自生成以来未被改动，且这一点由收货方自己算出",
-        "只覆盖被采集进交付物的范围；留存期限由你自己的存储策略决定，工具不强制 6 个月",
-    ),
-    (
-        "EU AI Act Art. 14（人类监督）",
-        "策略里的 approve 三态（高危调用挂起等人批）",
-        "高危调用存在人工闸门，且审批结果被记录下来",
-        "只看得到走该策略的调用；审批质量取决于人，工具无法替代监督义务本身",
-    ),
-    (
-        "EU AI Act Art. 11 / 13（技术文档与透明度）",
-        "报告的范围与方法、覆盖边界、以及策略的判定依据（rationale）",
-        "有一份可交付的技术说明，且每条权限判定都能追回依据",
-        "不生成完整技术文档：模型卡、数据治理、训练信息不在本工具视野内",
-    ),
-    (
-        "EU AI Act Art. 15（鲁棒性与网络安全）",
-        "最小权限策略本身（读写分离、破坏性操作默认拒绝）",
-        "agent 的能力面被显式收窄，且收窄依据可核查",
-        "不等于系统通过了网络安全评估；应用层漏洞不在覆盖范围内",
-    ),
-    (
-        "EU AI Act Art. 17（质量管理体系）",
-        "交付物可被第三方独立复验",
-        "交付流程本身可验证，可作为过程证据的一部分",
-        "QMS 是组织级体系；本工具只提供其中日志与可验证证据这一块的输入",
-    ),
-    (
-        "ISO/IEC 42001（AI 管理体系）",
-        "同上（策略依据 + 清单 + 独立校验）",
-        "可作为运行控制与监视测量条款的证据输入",
-        "不构成 42001 认证，也不代表该标准下的任何符合性声明",
-    ),
-]
+# 行的顺序即阅读顺序：先讲证据本身（Art.12），再讲人的介入，最后是文档与体系
+ROWS = ("art12", "art14", "art11", "art15", "art17", "iso")
+FIELDS = ("req", "art", "proves", "cannot")
 
 
-def render_markdown() -> str:
-    lines = ["## 合规条款映射（EU AI Act / ISO 42001）", ""]
-    lines.append(f"本节把交付物里的证据逐条对应到条款要求。**{DISCLAIMER}**")
+def render_markdown(locale: str | None = None) -> str:
+    loc = resolve_locale(locale)
+    lines = [t("compliance.heading", loc), ""]
+    lines.append(t("compliance.disclaimer", loc))
     lines.append("")
-    lines.append("| 条款要求 | 本工具的产物 | 能证明什么 | 不能证明什么 |")
+    lines.append(t("compliance.table_head", loc))
     lines.append("|---|---|---|---|")
-    for row in MAPPING:
-        lines.append("| " + " | ".join(row) + " |")
+    for row in ROWS:
+        cells = [t(f"compliance.{row}.{f}", loc) for f in FIELDS]
+        lines.append("| " + " | ".join(cells) + " |")
     lines.append("")
-    lines.append(
-        "映射只描述「这个产物能支撑哪条要求」，**不代表该要求已经满足**；"
-        "能否满足取决于你的部署范围、留存策略与人工流程。"
-    )
+    lines.append(t("compliance.closing", loc))
     return "\n".join(lines)
+
+
+def rows(locale: str | None = None) -> list[tuple[str, str, str, str]]:
+    """结构化取用（测试与将来的图形化报告都用它，不必解析 Markdown）。"""
+    loc = resolve_locale(locale)
+    return [tuple(t(f"compliance.{r}.{f}", loc) for f in FIELDS) for r in ROWS]

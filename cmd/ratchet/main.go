@@ -25,7 +25,7 @@ import (
 	"github.com/suhui-organization/ratchet/internal/store"
 )
 
-const version = "0.6.0"
+const version = "0.6.1"
 
 // InventoryFormat 是本工具认识的清单格式标识。
 const InventoryFormat = "ratchet-inventory/v1"
@@ -66,7 +66,8 @@ func usage() {
                   [--out <清单.json>] [--json]
   ratchet ingest [--hook codex] [--store <路径>] [--server <名>] [--agent <名>]
   ratchet policy draft --from <清单.json> [--out <策略.json>]
-                       [--agent <名字>] [--strict-unknown] [--only-observed] [--json]
+                       [--agent <名字>] [--strict-unknown] [--only-observed]
+                       [--lang en-US|zh-CN] [--json]
 
 说明：
   scan          只读本机配置，列出装了哪些 agent、挂了哪些 MCP server。
@@ -85,6 +86,7 @@ func usage() {
 
   --strict-unknown  无法判定能力的工具直接 deny（默认是 approve + 待确认）
   --only-observed   只授予被观测到调用过的工具（最小权限最严格的一档）
+  --lang            产物语言（默认 en-US）；CLI 自身的终端输出暂为中文
   --json            把策略 JSON 打到 stdout（不给 --out 时也能用管道接）
 `)
 }
@@ -439,6 +441,7 @@ func cmdPolicy(args []string) int {
 	agent := fs.String("agent", "", "覆盖清单里的 agent 名")
 	strict := fs.Bool("strict-unknown", false, "无法判定能力的工具直接 deny")
 	onlyObserved := fs.Bool("only-observed", false, "只授予被观测到调用过的工具")
+	lang := fs.String("lang", "", "产物语言：en-US（默认）或 zh-CN；也可用 RATCHET_LANG")
 	asJSON := fs.Bool("json", false, "把策略 JSON 打到 stdout")
 	if err := fs.Parse(args[1:]); err != nil {
 		return 2
@@ -454,10 +457,15 @@ func cmdPolicy(args []string) int {
 		return 1
 	}
 
+	loc := policy.ParseLocale(*lang)
+	if *lang == "" {
+		loc = policy.ParseLocale(os.Getenv("RATCHET_LANG"))
+	}
 	p := policy.Draft(inv, policy.Options{
 		StrictUnknown: *strict,
 		OnlyObserved:  *onlyObserved,
 		Agent:         *agent,
+		Locale:        loc,
 	})
 
 	if *out != "" {

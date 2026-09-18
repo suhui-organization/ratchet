@@ -25,6 +25,8 @@ type Options struct {
 	OnlyObserved bool
 	// Agent 覆盖清单里的 agent 名。
 	Agent string
+	// Locale 决定产物里的文字（判定依据）。零值 = en-US。
+	Locale Locale
 	// Now 注入时间，便于测试产出稳定输出。
 	Now time.Time
 }
@@ -81,13 +83,26 @@ func Draft(inv model.Inventory, opts Options) model.Policy {
 		if opts.OnlyObserved && t.Calls == 0 {
 			continue
 		}
-		cap, reason := Classify(t)
+		cap, match := classifyMatch(t)
 		dec, review := Decide(cap, opts.StrictUnknown)
+		loc := opts.Locale
+		if loc == "" {
+			loc = LocaleEN
+		}
+		reason := match.describe(loc)
 		// 观测到的调用次数是有用的上下文：写进依据里，报告和界面都要显示
 		if t.Calls > 0 {
-			reason += "；观测到 " + itoa(t.Calls) + " 次调用"
+			if loc == LocaleZH {
+				reason += "；观测到 " + itoa(t.Calls) + " 次调用"
+			} else {
+				reason += "; observed " + itoa(t.Calls) + " call(s)"
+			}
 		} else {
-			reason += "；未观测到调用（仅清单中存在）"
+			if loc == LocaleZH {
+				reason += "；未观测到调用（仅清单中存在）"
+			} else {
+				reason += "; never observed (present in the inventory only)"
+			}
 		}
 		entries = append(entries, entry{server: t.Server, tool: t.Tool, dec: dec, reason: reason, review: review})
 	}
