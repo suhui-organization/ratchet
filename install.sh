@@ -16,7 +16,9 @@
 #                      从同一个地址取哈希，只能防传输损坏，防不了地址被换。
 set -eu
 
-BASE_URL="${RATCHET_BASE_URL:-https://example.com/ratchet}"
+# 打包时由 `make release RELEASE_URL=...` 把这个占位符换成真实地址
+# （用占位符而不是正则替换：地址里的 :// 与 $ 在 sed 里都要转义，容易写错）
+BASE_URL="${RATCHET_BASE_URL:-__RATCHET_BASE_URL__}"
 VERSION="${RATCHET_VERSION:-0.6.0}"
 BIN_DIR="${RATCHET_BIN_DIR:-$HOME/.local/bin}"
 
