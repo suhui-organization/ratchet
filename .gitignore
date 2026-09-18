@@ -18,3 +18,4 @@ dist/
 
 # 交付物（本地生成，不进仓库）
 /delivery/
+/dist/
