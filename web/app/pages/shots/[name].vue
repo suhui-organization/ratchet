@@ -61,11 +61,14 @@ const colorOf = (c: string) =>
 </script>
 
 <template>
-  <div class="grid min-h-screen place-items-center bg-ink-950 p-10">
+  <!-- 不留白：卡片的包围盒就是最终图片的边界，由截图时的 clip 精确裁切。
+       上一版用 min-h-screen + place-items-center，导致卡片被 900px 高的画布居中，
+       上下各留两百多像素黑边——图一半是空的。 -->
+  <div class="inline-block bg-ink-950 p-0">
     <!-- 终端截图 -->
     <figure
       v-if="name !== 'verify'"
-      class="w-[1180px] overflow-hidden rounded-xl border border-ink-800 bg-ink-900 shadow-[0_40px_90px_-40px_rgba(0,0,0,1)]"
+      class="w-[1120px] overflow-hidden rounded-xl border border-ink-800 bg-ink-900"
     >
       <div class="flex items-center gap-2 border-b border-ink-800 px-5 py-3.5">
         <span class="h-3 w-3 rounded-full bg-ink-700"></span>
@@ -74,12 +77,12 @@ const colorOf = (c: string) =>
           ratchet — {{ name === 'policy' ? 'least-privilege compile' : 'static scan, executes nothing' }}
         </span>
       </div>
-      <pre class="px-6 py-6 font-mono text-[15px] leading-[2.05]"><code><span
+      <pre class="px-7 py-6 font-mono text-[15px] leading-[2]"><code><span
         v-for="(l, i) in lines" :key="i" class="block whitespace-pre" :class="colorOf(l.c)">{{ l.t || ' ' }}</span></code></pre>
     </figure>
 
     <!-- 验证页截图 -->
-    <figure v-else class="w-[1180px] overflow-hidden rounded-xl border border-ink-800 bg-ink-900 shadow-[0_40px_90px_-40px_rgba(0,0,0,1)]">
+    <figure v-else class="w-[1120px] overflow-hidden rounded-xl border border-ink-800 bg-ink-900">
       <div class="flex items-center gap-3 border-b border-ink-800 px-5 py-3">
         <span class="h-3 w-3 rounded-full bg-ink-700"></span>
         <span class="h-3 w-3 rounded-full bg-ink-800"></span>

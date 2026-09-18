@@ -5,9 +5,9 @@ import { useScrollStage } from '~/composables/useScrollStage'
 
 /** 滚动序列：三段真实运行画面，做法见 useScrollStage 的注释 */
 const shots = [
-  { src: '/shots/scan.jpg', caption: 'It reads your configs. Nothing is executed.' },
-  { src: '/shots/policy.jpg', caption: 'Every verdict carries the reason it was made.' },
-  { src: '/shots/verify.jpg', caption: 'The recipient re-computes the hashes on their own machine.' },
+  { src: '/shots/scan.jpg', w: 1120, h: 489, caption: 'It reads your configs. Nothing is executed.' },
+  { src: '/shots/policy.jpg', w: 1120, h: 399, caption: 'Every verdict carries the reason it was made.' },
+  { src: '/shots/verify.jpg', w: 1120, h: 532, caption: 'The recipient re-computes the hashes on their own machine.' },
 ] as const
 
 const stage = ref<HTMLElement | null>(null)
@@ -111,7 +111,7 @@ const limits = [
       <!-- 真机截图：1280×900 的原始运行输出，不是重画的示意图 -->
       <figure class="rise rise-2">
         <img
-          src="/shots/scan.jpg" width="1280" height="900" loading="eager" decoding="async"
+          src="/shots/scan.jpg" width="1120" height="489" loading="eager" decoding="async"
           alt="ratchet scan output: 16 MCP servers found, 12 unpinned, with package names listed in orange"
           class="w-full rounded-lg border border-ink-800 shadow-[0_24px_60px_-30px_rgba(0,0,0,0.95)]"
         />
@@ -125,9 +125,10 @@ const limits = [
           <div class="stage__stack">
             <img
               v-for="(shot, i) in shots" :key="shot.src"
-              :src="shot.src" width="1280" height="900" :loading="i === 0 ? 'eager' : 'lazy'" decoding="async"
+              :src="shot.src" :width="shot.w" :height="shot.h"
+              :loading="i === 0 ? 'eager' : 'lazy'" decoding="async"
               :alt="shot.caption"
-              class="w-full rounded-lg border border-ink-800 shadow-[0_30px_80px_-40px_rgba(0,0,0,1)]"
+              class="w-full self-center rounded-lg border border-ink-800 shadow-[0_30px_80px_-40px_rgba(0,0,0,1)]"
               :style="layerStyle(i)"
             />
           </div>
@@ -141,7 +142,6 @@ const limits = [
               <NuxtLink to="/verify" class="text-sm text-ink-200 hover:text-ink-050">Open the verifier →</NuxtLink>
             </span>
           </div>
-          <p class="sr-only">Scroll progress {{ Math.round(progress * 100) }}%</p>
         </div>
       </div>
     </section>
