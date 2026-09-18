@@ -1,0 +1,60 @@
+name: Release
+
+# 打 tag 就在 GitHub 端编译并发布，用户一条命令下载安装：
+#   curl -fsSL https://github.com/<owner>/<repo>/releases/latest/download/install.sh | sh
+#
+# 为什么由 CI 编译而不是让用户装 Go：目标机器上不该有任何构建依赖。
+# 用户拿到的是已经编好的二进制，唯一要做的事是校验 sha256（脚本自己会做）。
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      # 门禁先跑：编不出、测不过，就不要产出会被别人装到机器上的包
+      - name: Go tests
+        run: go vet ./... && go test ./...
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Service tests
+        working-directory: service
+        run: |
+          python -m pip install -q pytest
+          python -m pytest -q
+
+      # 四平台产物：install.sh 按 uname 挑对应的那一个
+      - name: Build all platforms
+        run: make dist
+
+      # 把发布地址烧进 install.sh。
+      # 用 releases/latest/download 而不是具体 tag：这样脚本不需要知道版本号，
+      # 每次发布用户拿到的都是最新版；版本由包名里的版本号体现。
+      - name: Assemble release bundle
+        run: |
+          make release RELEASE_URL="https://github.com/${{ github.repository }}/releases/latest/download"
+          # 自检：地址真的写进去了吗（写不进去就是一个 404 的安装命令）
+          grep -q "releases/latest/download" dist/release/install.sh
+          ls -la dist/release
+
+      - name: Publish release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/release/*
+          generate_release_notes: true
+          fail_on_unmatched_files: true

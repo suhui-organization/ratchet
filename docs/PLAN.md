@@ -70,4 +70,5 @@
 | 4.1 | `make dist` 出四平台产物，每个带 sha256 | ✅ |
 | 4.2 | `install.sh`：认平台 → 下载 → **校验 sha256，不一致就中止** → 装到 ~/.local/bin | ✅ 实测通过（含篡改用例） |
 | 4.3 | 主页展示一条安装命令（配了 `installUrl` 就自动切换） | ✅ |
-| 4.4 | 托管 install.sh 与 dist/ 产物 | ⏳ 需要你的托管位置 |
+| 4.4 | 托管 install.sh 与 dist/ 产物 | ⏳ 二选一：上传 `dist/release/` 到任意静态位置，或推到 GitHub 让 CI 发 Release |
+| 4.5 | GitHub Actions：打 tag 即在云端编译四平台并发布 Release | ✅ `.github/workflows/release.yml` |
