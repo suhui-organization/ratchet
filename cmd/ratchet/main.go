@@ -10,19 +10,22 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/suhui-organization/ratchet/internal/discover"
+	"github.com/suhui-organization/ratchet/internal/hook"
 	"github.com/suhui-organization/ratchet/internal/mcp"
 	"github.com/suhui-organization/ratchet/internal/model"
 	"github.com/suhui-organization/ratchet/internal/observe"
 	"github.com/suhui-organization/ratchet/internal/policy"
+	"github.com/suhui-organization/ratchet/internal/store"
 )
 
-const version = "0.3.0"
+const version = "0.4.0"
 
 // InventoryFormat 是本工具认识的清单格式标识。
 const InventoryFormat = "ratchet-inventory/v1"
@@ -41,6 +44,8 @@ func main() {
 		os.Exit(cmdScan(os.Args[2:]))
 	case "observe":
 		os.Exit(cmdObserve(os.Args[2:]))
+	case "ingest":
+		os.Exit(cmdIngest(os.Args[2:]))
 	case "help", "--help", "-h":
 		usage()
 	default:
@@ -144,6 +149,42 @@ func cmdObserve(args []string) int {
 		return 0
 	}
 	renderObserve(os.Stdout, summary, cmp, *out, len(withCalls.Tools))
+	return 0
+}
+
+// cmdIngest 从 stdin 读一条 agent 事件，追加进本地调用记录。
+//
+// **绝不阻塞 agent**：这是挂在一个交互式工具调用链上的 hook，
+// 它出错、超时、或者 pod 二进制不在——都不该让用户的工作流卡住。
+// 所以任何异常都安静地退出 0。
+func cmdIngest(args []string) int {
+	fs := flag.NewFlagSet("ingest", flag.ContinueOnError)
+	hookName := fs.String("hook", "codex", "事件来源（目前支持 codex）")
+	storePath := fs.String("store", "", "调用记录文件路径（默认 $RATCHET_HOME/calls.jsonl）")
+	server := fs.String("server", "", "覆盖 server 名（默认 codex-tools）")
+	agent := fs.String("agent", "", "覆盖 agent 名（默认 codex）")
+	if err := fs.Parse(args); err != nil {
+		return 0
+	}
+	if *hookName != "codex" {
+		fmt.Fprintf(os.Stderr, "不支持的事件来源：%s（目前只有 codex）\n", *hookName)
+		return 0
+	}
+
+	raw, err := io.ReadAll(io.LimitReader(os.Stdin, 1<<20))
+	if err != nil {
+		return 0
+	}
+	call, ok := hook.FromCodex(raw, *server, *agent)
+	if !ok {
+		return 0
+	}
+	if err := store.Append(*storePath, call); err != nil {
+		// 写不进去也不能打断 agent；但要让用户有机会发现，
+		// 所以往 stderr 说一句（hook 的 stderr 不进 agent 上下文）。
+		fmt.Fprintf(os.Stderr, "ratchet ingest: 写入调用记录失败：%v\n", err)
+		return 0
+	}
 	return 0
 }
 

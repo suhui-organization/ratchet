@@ -26,7 +26,8 @@
 | 1.5 | **真实扫描**：读 harness 配置 + MCP `tools/list` 生成清单 | ✅ 见 [DELIVERY-0.2.0](DELIVERY-0.2.0.md) |
 | 1.6 | 更多 harness 方言 + 远程 server 的 introspect | ⏳ |
 | 1.7 | 用调用记录填 `calls` + 能力面/使用面比对 | ✅ 见 [DELIVERY-0.3.0](DELIVERY-0.3.0.md) |
-| 1.8 | **采集侧**：hook / 网关产生调用记录（当前只消费不生产） | ⏳ 下一个大件 |
+| 1.8 | **采集侧**：Codex hook 产生调用记录 | ✅ 见 [DELIVERY-0.4.0](DELIVERY-0.4.0.md) |
+| 1.9 | 其他 harness 的采集（Claude Code 等） | ⏳ |
 
 ### P2 · 交付物（下一步）
 
