@@ -11,10 +11,19 @@ async function copy(text: string, key: string) {
   } catch { copied.value = '' }
 }
 
-const blocks = [
-  { key: 'build', label: 'Build from source', lines: ['cd ratchet && make build', 'make dist   # binary + sha256'] },
-  { key: 'scan', label: 'Scan your machine', lines: ['./bin/ratchet scan --home ~'] },
-] as const
+/**
+ * 安装块。有托管地址时给"一条命令"，没有时退回源码构建——
+ * 不给一个点了 404 的安装命令。
+ */
+const blocks = site.installUrl
+  ? [
+      { key: 'install', label: 'Install', lines: [`curl -fsSL ${site.installUrl}/install.sh | sh`] },
+      { key: 'scan', label: 'Then scan your machine', lines: ['ratchet scan --home ~'] },
+    ]
+  : [
+      { key: 'build', label: 'Build from source', lines: ['cd ratchet && make build', 'make dist   # 4 platforms, each with a sha256'] },
+      { key: 'scan', label: 'Scan your machine', lines: ['./bin/ratchet scan --home ~'] },
+    ]
 
 const features = [
   {
@@ -171,7 +180,7 @@ const limits = [
       <div class="mx-auto max-w-4xl px-6 py-20 text-center">
         <h2 class="text-[1.9rem] font-semibold tracking-[-0.025em] text-ink">Get started</h2>
         <p class="mx-auto mt-4 max-w-[48ch] text-[15px] leading-relaxed text-muted">
-          {{ site.downloadUrl ? 'Download a prebuilt binary, or build it yourself.' : 'No public build yet — it is going to a small number of people first.' }}
+          {{ site.installUrl ? "One command. It downloads the binary for your platform and verifies its sha256 before installing." : "No public build yet — it is going to a small number of people first. The source is not public either; ask and I will send a build with its sha256." }}
         </p>
         <div class="mt-8 flex flex-wrap items-center justify-center gap-x-7 gap-y-3 text-[15px]">
           <a v-if="site.downloadUrl" :href="site.downloadUrl"

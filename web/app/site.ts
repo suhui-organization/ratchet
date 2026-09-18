@@ -19,6 +19,13 @@ export const site = {
    * 宁可不给下载入口，也不要给一个点了 404 的按钮。
    */
   downloadUrl: '',
+  /**
+   * 托管 install.sh 与二进制包的地址（同一个目录）。
+   * 填上之后，主页的「Install」代码块会自动变成一条命令：
+   *   curl -fsSL <installUrl>/install.sh | sh
+   * 产物由 `make dist` 生成，把 dist/ 与 install.sh 放在同一个目录即可。
+   */
+  installUrl: '',
   /** 无下载地址时的联系入口。 */
   contactUrl: 'mailto:ratchet@example.com?subject=Ratchet%20access',
   /** 源码获取方式（仓库暂不公开，写清楚而不是留假链接）。 */
