@@ -64,6 +64,7 @@ func usage() {
                [--out <清单.json>] [--timeout <秒>] [--json]
   ratchet observe --calls <调用记录.jsonl> [--inventory <清单.json>]
                   [--out <清单.json>] [--json]
+  ratchet ingest [--hook codex] [--store <路径>] [--server <名>] [--agent <名>]
   ratchet policy draft --from <清单.json> [--out <策略.json>]
                        [--agent <名字>] [--strict-unknown] [--only-observed] [--json]
 
@@ -77,6 +78,10 @@ func usage() {
 
   observe       把真实调用记录对到清单上：哪些在用、哪些从未被用过、
                 哪些**不在清单里却被调用过**（清单不全或有人绕过配置）。
+
+  ingest        从 stdin 读一条 agent 事件（Codex PostToolUse），追加进本地调用记录。
+                挂成 hook 后每次工具调用都会记一行；解析失败静默退出，**绝不阻塞 agent**。
+                默认只记 server/tool，不记工具参数（参数里常含密钥与文件内容）。
 
   --strict-unknown  无法判定能力的工具直接 deny（默认是 approve + 待确认）
   --only-observed   只授予被观测到调用过的工具（最小权限最严格的一档）
