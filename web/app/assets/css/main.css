@@ -86,3 +86,26 @@ a { text-underline-offset: 0.25em; }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
 }
+
+/* ── 滚动序列（paddle 同类手法）────────────────────────────────────────
+   外层给足高度，内层 sticky 钉住，滚动只用来产生进度。
+   三层用 grid 叠在同一个格子里，靠 transform/opacity 完成切换——
+   不用绝对定位，是因为它会让高度塌掉，grid 叠放天然保持占位。 */
+.stage { height: 340vh; }
+.stage__inner {
+  position: sticky;
+  top: 0;
+  display: grid;
+  place-items: center;
+  height: 100vh;
+}
+.stage__stack { display: grid; }
+.stage__stack > * { grid-area: 1 / 1; }
+
+/* 关掉动效时退化为三张静态堆叠图：信息一条不少，只是不动 */
+@media (prefers-reduced-motion: reduce) {
+  .stage { height: auto; }
+  .stage__inner { position: static; height: auto; padding: 3rem 0; }
+  .stage__stack { gap: 1.5rem; }
+  .stage__stack > * { grid-area: auto; opacity: 1 !important; transform: none !important; }
+}

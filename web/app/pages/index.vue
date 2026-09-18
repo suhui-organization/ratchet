@@ -1,6 +1,29 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { site } from '~/site'
+import { useScrollStage } from '~/composables/useScrollStage'
+
+/** 滚动序列：三段真实运行画面，做法见 useScrollStage 的注释 */
+const shots = [
+  { src: '/shots/scan.jpg', caption: 'It reads your configs. Nothing is executed.' },
+  { src: '/shots/policy.jpg', caption: 'Every verdict carries the reason it was made.' },
+  { src: '/shots/verify.jpg', caption: 'The recipient re-computes the hashes on their own machine.' },
+] as const
+
+const stage = ref<HTMLElement | null>(null)
+const { progress, active, layerProgress } = useScrollStage(stage, shots.length)
+
+/** 把某一段的进度映射成"进入 → 停住 → 离开"的位移与缩放 */
+function layerStyle(i: number) {
+  const p = layerProgress(i)
+  const enter = Math.min(1, p / 0.35)
+  const exit = Math.max(0, (p - 0.72) / 0.28)
+  return {
+    opacity: String(Math.min(enter, 1 - exit)),
+    transform: `translate3d(0, ${((1 - enter) * 44 - exit * 32).toFixed(1)}px, 0) scale(${(0.94 + enter * 0.06 + exit * 0.03).toFixed(3)})`,
+    willChange: 'transform, opacity',
+  }
+}
 
 const copied = ref('')
 async function copy(text: string, key: string) {
@@ -95,19 +118,32 @@ const limits = [
       </figure>
     </section>
 
-    <!-- 第二个真机截图：编译产物长什么样 -->
-    <section class="mx-auto max-w-6xl px-6 pb-20">
-      <figure>
-        <img
-          src="/shots/policy.jpg" width="1280" height="900" loading="lazy" decoding="async"
-          alt="ratchet policy draft output: three tools resolved to allow and approve, each with the reason it was decided that way"
-          class="w-full rounded-lg border border-ink-800 shadow-[0_24px_60px_-30px_rgba(0,0,0,0.95)]"
-        />
-        <figcaption class="mt-3 text-[13px] text-ink-400">
-          One command turns the surface into a policy. Every verdict carries the reason it was made —
-          and the tools that were never called don't make it in at all.
-        </figcaption>
-      </figure>
+    <!-- 滚动序列：三张真实运行画面在同一个位置切换 -->
+    <section ref="stage" class="stage relative" aria-label="Product walkthrough">
+      <div class="stage__inner">
+        <div class="mx-auto w-full max-w-5xl px-6">
+          <div class="stage__stack">
+            <img
+              v-for="(shot, i) in shots" :key="shot.src"
+              :src="shot.src" width="1280" height="900" :loading="i === 0 ? 'eager' : 'lazy'" decoding="async"
+              :alt="shot.caption"
+              class="w-full rounded-lg border border-ink-800 shadow-[0_30px_80px_-40px_rgba(0,0,0,1)]"
+              :style="layerStyle(i)"
+            />
+          </div>
+          <div class="mt-6 flex items-center gap-4">
+            <div class="flex gap-1.5" aria-hidden="true">
+              <span v-for="(s, i) in shots" :key="s.src" class="h-1 w-8 rounded-full transition-colors duration-300"
+                    :class="i === active ? 'bg-ink-200' : 'bg-ink-800'"></span>
+            </div>
+            <p class="text-sm text-ink-400">{{ shots[active].caption }}</p>
+            <span v-if="active === 2" class="ml-auto">
+              <NuxtLink to="/verify" class="text-sm text-ink-200 hover:text-ink-050">Open the verifier →</NuxtLink>
+            </span>
+          </div>
+          <p class="sr-only">Scroll progress {{ Math.round(progress * 100) }}%</p>
+        </div>
+      </div>
     </section>
 
     <section class="border-y border-ink-800 bg-ink-900/40">
@@ -155,34 +191,6 @@ const limits = [
                 class="absolute top-5 right-[-1.25rem] hidden h-px w-10 bg-ink-800 lg:block"></span>
         </li>
       </ol>
-    </section>
-
-    <section class="border-y border-ink-800 bg-ink-900/40">
-      <div class="mx-auto grid max-w-6xl items-center gap-14 px-6 py-20 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
-        <div>
-          <h2 class="text-[1.6rem] leading-tight font-medium tracking-[-0.02em] text-ink-050">
-            The recipient verifies. You don't ask them to trust you.
-          </h2>
-          <p class="mt-5 max-w-[52ch] text-sm leading-relaxed text-ink-400">
-            Every delivery carries a sha256 manifest. Hashes are recomputed on the reader's
-            machine — in a browser, or with one standard-library script.
-          </p>
-          <NuxtLink to="/verify" class="mt-6 inline-flex items-center gap-2 text-sm text-ink-200 hover:text-ink-050">
-            Open the verifier
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-4 w-4">
-              <path d="M5 12h14M13 6l6 6-6 6" stroke-linecap="round" stroke-linejoin="round" />
-            </svg>
-          </NuxtLink>
-        </div>
-
-        <figure>
-          <img
-            src="/shots/verify.jpg" width="1280" height="900" loading="lazy" decoding="async"
-            alt="The verifier page: a green 'Verification passed' bar and a table of three files with match / not in bundle verdicts"
-            class="w-full rounded-lg border border-ink-800 shadow-[0_24px_60px_-30px_rgba(0,0,0,0.95)]"
-          />
-        </figure>
-      </div>
     </section>
 
     <section class="mx-auto max-w-6xl px-6 py-16">
