@@ -19,7 +19,10 @@ set -eu
 # 打包时由 `make release RELEASE_URL=...` 把这个占位符换成真实地址
 # （用占位符而不是正则替换：地址里的 :// 与 $ 在 sed 里都要转义，容易写错）
 BASE_URL="${RATCHET_BASE_URL:-__RATCHET_BASE_URL__}"
-VERSION="${RATCHET_VERSION:-0.6.0}"
+# 版本号由 `make release` 烧进来（与 BASE_URL 同法）。
+# 写死的默认值会在升版本时漂移：脚本去下载一个已经不在最新 Release 里的旧包，
+# 表现是"下载失败"，而真正的原因是版本号没跟着改。
+VERSION="${RATCHET_VERSION:-__RATCHET_VERSION__}"
 BIN_DIR="${RATCHET_BIN_DIR:-$HOME/.local/bin}"
 
 say()  { printf '  %s\n' "$*"; }

@@ -46,11 +46,15 @@ release: dist
 	@mkdir -p dist/release
 	@# 把发布地址烧进 install.sh：别人 `curl | sh` 时脚本里没有 $0 路径可用，
 	@# 只能在这里替换默认值，否则内层下载会跑到占位地址去。
-	@sed 's|__RATCHET_BASE_URL__|$(RELEASE_URL)|' \
+	@sed -e 's|__RATCHET_BASE_URL__|$(RELEASE_URL)|' \
+	     -e 's|__RATCHET_VERSION__|$(VERSION)|' \
 	  install.sh > dist/release/install.sh
 	@chmod 0755 dist/release/install.sh
 	@grep -q '$(RELEASE_URL)' dist/release/install.sh \
 	  || { echo "发布地址没写进 install.sh，检查 sed"; exit 1; }
+	@# 版本号必须与本次构建一致：不一致的安装命令会去取一个不存在的包
+	@grep -q "RATCHET_VERSION:-$(VERSION)}" dist/release/install.sh \
+	  || { echo "install.sh 里的版本号不是 $(VERSION)，检查 sed"; exit 1; }
 	@cp dist/ratchet_$(VERSION)_*.tar.gz dist/ratchet_$(VERSION)_*.sha256 dist/release/
 	@cd dist/release && cat ratchet_$(VERSION)_*.sha256 > SHA256SUMS
 	@printf '%s\n' \
