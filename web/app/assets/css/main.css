@@ -1,10 +1,88 @@
 @import "tailwindcss";
 
-/* 克制的中性色：这是一份要看的证据，不是要打动人的落地页 */
-:root {
-  color-scheme: light;
+/* 自托管字体：不依赖系统默认脸，也不请求第三方 CDN */
+@font-face {
+  font-family: "Bricolage Grotesque";
+  src: url("/fonts/bricolage-grotesque.woff2") format("woff2-variations");
+  font-weight: 300 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/fonts/jetbrains-mono-400.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/fonts/jetbrains-mono-500.woff2") format("woff2");
+  font-weight: 500;
+  font-display: swap;
+}
+
+@theme {
+  /* 选它而不是 Inter / Space Grotesk：这一类的面孔所有同类站点都在用，
+     等于没有做过选择。Bricolage 的字形有轻微的不规则感，配等宽的工程语气刚好。 */
+  --font-sans: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* 一套冷调中性色 + 两个语义色；亮暗都由这组推出来，不临时取色 */
+  --color-ink-950: oklch(0.16 0.014 250);
+  --color-ink-900: oklch(0.2 0.016 250);
+  --color-ink-800: oklch(0.26 0.016 250);
+  --color-ink-700: oklch(0.36 0.014 250);
+  --color-ink-400: oklch(0.62 0.012 250);
+  --color-ink-200: oklch(0.82 0.008 250);
+  --color-ink-050: oklch(0.97 0.004 250);
+  --color-flag: oklch(0.68 0.16 55);
+  --color-pass: oklch(0.72 0.15 155);
+}
+
+html {
+  color-scheme: dark;
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  @apply bg-slate-50 text-slate-800 antialiased;
+  background: var(--color-ink-950);
+  color: var(--color-ink-200);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 浏览器表面也属于这个设计：选区、滚动条、焦点环、下划线偏移 */
+::selection {
+  background: color-mix(in oklch, var(--color-flag) 40%, transparent);
+  color: var(--color-ink-050);
+}
+* { scrollbar-width: thin; scrollbar-color: var(--color-ink-700) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: var(--color-ink-800);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 99px;
+}
+:focus-visible {
+  outline: 2px solid var(--color-flag);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+a { text-underline-offset: 0.25em; }
+.tnum { font-variant-numeric: tabular-nums; }
+
+/* 唯一的入场动效：从已可见状态轻微上浮 */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes rise {
+    from { opacity: 0.001; transform: translateY(10px); filter: blur(4px); }
+    to { opacity: 1; transform: none; filter: none; }
+  }
+  .rise { animation: rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .rise-2 { animation-delay: 0.08s; }
+  .rise-3 { animation-delay: 0.16s; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
 }
