@@ -187,6 +187,32 @@ introspection 检查，再把 Glama 分数徽章加到条目里。现状：
    **有 DOM 接口就别猜元素号**。
 
 审核通过、拿到徽章地址后，把徽章补进 awesome-mcp-servers 的 PR（机器人会重新检查）。
+
+## 11. 第二轮社交：dev.to 已发、Reddit 被网络策略拦住
+
+### dev.to（已发布）
+
+https://dev.to/waldenwuwei/i-counted-what-my-ai-agents-can-actually-touch-16-mcp-servers-164-tools-15-denials-1lmj
+
+- 正文用 `01` / `03` 两篇内容包的真实数字（16 server / 12 未锁 / 164 工具 / allow 43 · approve 106 · deny 15），
+  并把两条**误判**写进去（`resolve-library-id` 命中 "format"、`sequentialthinking` 命中 "clear"）；
+- **canonical_url 已设为 `https://podcloud.dlszjr.com`**（已用 dev.to API 复核：
+  `canonical: https://podcloud.dlszjr.com`）——不设的话 SEO 权重会全给 dev.to；
+- 发布用的方式是 Playwright 接口（`#article-form-title` / `#article_body_markdown` / `#canonicalUrl`），
+  比猜 AX 元素号稳得多；"Publish" 要点两次（第一次被编辑器里的状态抢走了）；
+- 遗留：tags 没加上（`#tag-input` 需要 type+Enter 而不是 fill），下次发时补。
+
+### Reddit r/mcp（发不出去，有证据）
+
+从这台机器的出口 IP（59.46.235.173）访问 Reddit 被**整站网络策略拦截**，新旧界面都一样：
+
+- `https://www.reddit.com/r/mcp/submit` → `You've been blocked by network security.`
+- `https://old.reddit.com/r/mcp/submit` → `Your request has been blocked due to a network policy.`
+
+这不是登录问题（拦截页在登录之前就返回了），也不是浏览器的问题——是这个网段被 Reddit 挡了。
+绕过的办法只有两条：换网络（手机热点/境外节点）发，或走 Reddit 的 developer token。
+文案已经备好（[content/01](content/01-scan-report.en.md) 的 "Reddit — r/mcp" 段），
+在手机浏览器里贴一次即可，不需要改动。
 ## 8. 这一轮之后的判据
 
 按 GTM 的止损线看，接下来两周要盯的是三个数，不是 star：
