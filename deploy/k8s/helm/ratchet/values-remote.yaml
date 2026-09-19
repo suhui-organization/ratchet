@@ -12,7 +12,7 @@ image:
     - name: ratchet-swr
   web:
     # 发版时改这一行（tag 跟内容走，形如 <版本>-<短 sha>）
-    tag: "0.12.0-bootstrap"
+    tag: "0.12.0-b5a9e5c"
 
 web:
   replicaCount: 2
