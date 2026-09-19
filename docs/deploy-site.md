@@ -1,5 +1,10 @@
 # 部署站点
 
+> 线上现状（2026-09-19）：**主路径是自建 K8s + 华为 SWR**，出口 `https://podcloud.dlszjr.com`。
+> 完整的命令、回滚与出口域名映射见 [../deploy/swr/README.md](../deploy/swr/README.md)
+> 与 [../deploy/k8s/DEPLOY.md](../deploy/k8s/DEPLOY.md)。本文下面保留 Vercel 与
+> 任意静态托管的做法——站点是纯静态的，这些路径都成立，只是线上不用它们。
+
 站点是**纯静态**的：落地页 + 验证页（哈希在浏览器里算，不需要服务端）。
 所以任何静态托管都能用，而且不需要任何环境变量或密钥。
 
@@ -32,9 +37,10 @@ npm run generate      # 产物在 web/.output/public
 
 之后每次 push 到 `main` 都会自动重新部署。
 
-绑域名时注意：`podcloud.dlszjr.com` 现在指向旧站点，
-要改到 ratchet 需要在 **Vercel → Project → Settings → Domains** 里加这个域名，
-然后去 DNS 把记录指到 Vercel 给的 CNAME。
+绑域名时注意：`podcloud.dlszjr.com` **已经被集群那条路用掉了**
+（DNS 的 A 记录指向 59.46.235.173，即 web01 的公网出口，web01 再按 server_name
+反代到集群 NodePort）。所以别再把这个域名加到 Vercel：两处同时配同一个域名，
+改 DNS 就会变成"谁生效看运气"。要给 Vercel 版本一个地址，用一个没被占用的子域名。
 
 ## 自己的服务器 / 对象存储
 
