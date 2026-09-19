@@ -334,6 +334,36 @@ about `https://podcloud.dlszjr.com`），reCAPTCHA 也过了一次（token 2425 
 
 **LinkedIn 是给"一次性权限审计"这门生意用的**，不是给 CLI 拉 star 的：目标是那些要替客户回答
 "agent 能碰什么"的人。后续内容方向继续走合规与交付，不要走命令行技巧。
+
+## 17. Smithery：流程已变，server 记录已建（2026-09-20）
+
+用户给了 API key，用它跑了一遍官方 API：
+
+| 步骤 | 结果 |
+|---|---|
+| `GET /namespaces` | 命名空间是 **`iverson-wuwei`**（不是 GitHub 那个 `iversonwuwei`，第一次写错了，API 回 `Namespace not found`） |
+| `PUT /servers/iverson-wuwei/ratchet` | **成功**，`qualifiedName: iverson-wuwei/ratchet`，visibility public |
+
+### 但"发布"这一步的规则变了
+
+Smithery 现在只支持三种 release 类型（`PUT /servers/{qualifiedName}/releases`，multipart）：
+
+1. **hosted** —— 上传 JS module；2. **external** —— 给一个公网 HTTPS 的 streamable-HTTP 地址；
+3. **stdio** —— 上传 **MCPB 包**（MCP Bundle，原来的 DXT）。
+
+老的 `smithery.yaml` + CLI 那套流程在他们的文档里已经没有了。我们的 ratchet 是本地 stdio server，
+所以只能走第 3 条：**自己打一个 MCPB 包**（zip：`manifest.json` + 各平台二进制 + `server/` 入口），
+再 POST 上去。
+
+这不是"填个表"能完成的，是一个小工程（要按 MCPB 规范写 manifest、放四平台产物、本地验一遍
+能不能被客户端拉起）。两条路可选：
+
+**A. 打 MCPB 包发 stdio**（保住"数据不出机器"这个卖点）——下一轮做，工程量约半天；
+**B. 在我们的集群上提供一个公网 streamable-HTTP 端点**（`podcloud.dlszjr.com` 已经有 HTTPS + k8s），
+按 external 类型发布（工程量更大，且意味着我们要长期运行一个公开服务——与产品"跑在你自己机器上"
+的定位有张力，需要产品决策）。
+
+倾向 A：Smithery 的流量值得要，但不值得为它改产品形态。
 ## 8. 这一轮之后的判据
 
 按 GTM 的止损线看，接下来两周要盯的是三个数，不是 star：

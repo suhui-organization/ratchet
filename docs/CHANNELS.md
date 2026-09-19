@@ -16,7 +16,7 @@
 | Docker 官方 MCP Catalog | 待审 | [PR #5164](https://github.com/docker/mcp-registry/pull/5164)，Docker Desktop 用户可见 |
 | punkpeye/awesome-mcp-servers | 待审 | [PR #14700](https://github.com/punkpeye/awesome-mcp-servers/pull/14700)，机器人要求先有 Glama 徽章 |
 | awesome-ai-security-tools | 待审 | [PR #117](https://github.com/scadastrangelove/awesome-ai-security-tools/pull/117)，按规则进观察名单 |
-| Smithery | 待做 | 需要 `smithery.yaml` + 账号授权 |
+| Smithery | 半完成 | **server 记录已建**：`iverson-wuwei/ratchet`（API `PUT /servers/iverson-wuwei/ratchet`）。发布 release 还差一个 **MCPB 包**——见下方说明 |
 | PulseMCP | 阻塞 | `/submit` 用 curl 能取到 200，但**内置浏览器导航超时**（bot 防护）。它抓官方 Registry，我们已在那上面，大概率自然收录 |
 | mcp.so | 阻塞 | `/submit` 返回 307 跳登录，需要账号态 |
 | mcpmarket.com | 阻塞 | 同上：curl 200，但**内置浏览器导航超时**（2026-09-20 实测） |
