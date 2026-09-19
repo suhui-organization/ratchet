@@ -1,0 +1,19 @@
+name: Feature request
+description: Suggest a capability
+title: "[feature] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: 先讲场景，再讲你想要的功能——场景比功能列表有用得多。
+    validations:
+      required: true
+  - type: textarea
+    id: today
+    attributes:
+      label: How do you handle it today?
+      description: 现在是怎么绕过去的？（手工、别的不具、忍着）——这条决定了它值不值得做。
+    validations:
+      required: true

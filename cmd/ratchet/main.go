@@ -16,7 +16,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/suhui-organization/ratchet/internal/deliver"
 	"github.com/suhui-organization/ratchet/internal/discover"
+	"github.com/suhui-organization/ratchet/internal/feedback"
 	"github.com/suhui-organization/ratchet/internal/hook"
 	"github.com/suhui-organization/ratchet/internal/mcp"
 	"github.com/suhui-organization/ratchet/internal/mcpserver"
@@ -27,7 +29,7 @@ import (
 	"github.com/suhui-organization/ratchet/internal/store"
 )
 
-const version = "0.11.0"
+const version = "0.12.0"
 
 // InventoryFormat 是本工具认识的清单格式标识。
 const InventoryFormat = "ratchet-inventory/v1"
@@ -54,6 +56,10 @@ func main() {
 			fmt.Fprintf(os.Stderr, "ratchet mcp: %v\n", err)
 			os.Exit(1)
 		}
+	case "deliver":
+		os.Exit(cmdDeliver(os.Args[2:]))
+	case "feedback":
+		os.Exit(cmdFeedback(os.Args[2:]))
 	case "help", "--help", "-h":
 		usage()
 	default:
@@ -75,6 +81,9 @@ func usage() {
   ratchet ingest [--hook auto|codex|claude-code|generic] [--store <路径>]
                  [--server <名>] [--agent <名>]
   ratchet mcp                                  # 以 stdio MCP server 运行
+  ratchet deliver --out <目录> [--home <dir>] [--calls <记录.jsonl>]
+                  [--client <名字>] [--only-observed] [--lang en-US|zh-CN]
+  ratchet feedback [--kind bug|false-positive|feature] [--summary "一句话"]
   ratchet policy draft --from <清单.json> [--out <策略.json>]
                        [--agent <名字>] [--strict-unknown] [--only-observed]
                        [--lang en-US|zh-CN] [--json]
@@ -108,6 +117,13 @@ func usage() {
   mcp           以 stdio MCP server 运行，暴露三个只读工具：
                 ratchet_scan / ratchet_policy / ratchet_check。
                 让 agent 自己能问"我现在能碰什么"；也是官方 Registry 收录的前提。
+
+  deliver       把一次交付的四步串成一条命令：扫描 → 观测 → 编译策略 → 出报告。
+                报告那一步调 Python 工具（ratchet-report）；它不在时不假装跑过，
+                前三步的产物照样有效。**利润率就在这四步之间。**
+
+  feedback      生成一段可以贴到 issue 的正文。不会自动发送任何东西：
+                路径先被折叠成 …/最后一段，你过一眼再决定发什么。
 
   --strict-unknown  无法判定能力的工具直接 deny（默认是 approve + 待确认）
   --only-observed   只授予被观测到调用过的工具（最小权限最严格的一档）
@@ -193,6 +209,115 @@ func cmdPolicyCheck(args []string) int {
 	if decision != three {
 		fmt.Printf("              ↑ 参数约束把它从 %s 收成了 %s\n", three, decision)
 	}
+	return 0
+}
+
+// cmdDeliver 把一次交付的四步串成一条命令。
+//
+// 报告渲染在 Python 侧（只有一份实现），所以这一步用子进程调用；
+// 它不在时不假装跑过——前三步的产物照样有效，并把该跑的命令打出来。
+func cmdDeliver(args []string) int {
+	fs := flag.NewFlagSet("deliver", flag.ContinueOnError)
+	home := fs.String("home", "", "扫描哪个 HOME（默认当前用户）")
+	work := fs.String("workdir", ".", "项目级配置所在目录")
+	calls := fs.String("calls", "", "调用记录 JSONL（默认 ~/.ratchet/calls.jsonl）")
+	out := fs.String("out", "", "交付目录（必填）")
+	agent := fs.String("agent", "", "agent 名（写进策略与报告）")
+	client := fs.String("client", "", "客户名（写进报告封面）")
+	lang := fs.String("lang", "", "产物语言：en-US（默认）/ zh-CN")
+	only := fs.Bool("only-observed", false, "只授予被观测到调用过的工具")
+	reportCmd := fs.String("report-cmd", "ratchet-report", "报告生成器命令")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if *out == "" {
+		fmt.Fprintln(os.Stderr, "缺少 --out：需要指定交付目录")
+		return 2
+	}
+	if *home == "" {
+		if h, err := os.UserHomeDir(); err == nil {
+			*home = h
+		}
+	}
+	if *calls == "" {
+		*calls = store.CallsPath()
+	}
+	loc := *lang
+	if loc == "" {
+		loc = os.Getenv("RATCHET_LANG")
+	}
+
+	res, err := deliver.Run(deliver.Options{
+		Home: *home, Workdir: *work, Calls: *calls, OutDir: *out,
+		Agent: *agent, Lang: loc, OnlyObserved: *only, Client: *client,
+		ReportCmd: strings.Fields(*reportCmd),
+	})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "交付失败：%v\n", err)
+		return 1
+	}
+	fmt.Printf("ratchet %s — 一次交付\n\n", version)
+	for _, s := range res.Steps {
+		mark := "✅"
+		if !s.OK {
+			mark = "⚠️"
+		}
+		fmt.Printf("  %s %-9s %s\n", mark, s.Name, s.Note)
+	}
+	if res.Delivery != "" {
+		fmt.Printf("\n  交付目录    %s\n", res.Delivery)
+		fmt.Printf("  分享包      %s\n", res.Bundle)
+		fmt.Printf("  收货方验证  python3 verify.py %s\n", res.Delivery)
+	} else {
+		fmt.Printf("\n  策略与清单已写出；报告那一步没跑成，按上面的提示手工执行即可。\n")
+	}
+	return 0
+}
+
+// cmdFeedback 生成反馈正文。
+//
+// 它**不发送任何东西**——只打印文本文档，用户自己决定贴到哪。
+// 加一行遥测就把"数据不出机器"这个卖点毁了，所以这里连网络调用都没有。
+func cmdFeedback(args []string) int {
+	fs := flag.NewFlagSet("feedback", flag.ContinueOnError)
+	kind := fs.String("kind", "bug", "bug / false-positive / feature")
+	summary := fs.String("summary", "", "一句话说明发生了什么")
+	detail := fs.String("detail", "", "补充说明（会一起打码）")
+	home := fs.String("home", "", "扫描哪个 HOME（默认当前用户）")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if *home == "" {
+		if h, err := os.UserHomeDir(); err == nil {
+			*home = h
+		}
+	}
+
+	rep := discover.Scan(*home, ".")
+	servers, unpinned := 0, 0
+	for _, h := range rep.Harnesses {
+		for _, s := range h.Servers {
+			servers++
+			if s.Risk != "" {
+				unpinned++
+			}
+		}
+	}
+	body := feedback.Build(feedback.Input{
+		Version: version,
+		Kind:    *kind,
+		Summary: *summary,
+		Detail:  *detail,
+		Home:    *home,
+		Counts: map[string]int{
+			"harnesses": len(rep.Harnesses),
+			"servers":   servers,
+			"unpinned":  unpinned,
+			"unparsed":  len(rep.Unparsed),
+		},
+		IssueURL: "https://github.com/suhui-organization/ratchet/issues/new",
+	})
+	fmt.Println(body)
 	return 0
 }
 

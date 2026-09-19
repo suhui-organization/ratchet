@@ -1,0 +1,33 @@
+name: False positive
+description: Ratchet flagged something that is actually fine
+title: "[false positive] "
+labels: ["false-positive"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **误报是这类工具的死因。** 报上来比忍着用更有价值——谢谢你花这个时间。
+
+        最快的填法：在终端跑 `ratchet feedback --kind false-positive --summary "…"`，
+        它会**先把路径打码**再打印一段可以贴进来的正文。
+  - type: textarea
+    id: what
+    attributes:
+      label: What was flagged?
+      description: 被误判的是哪条规则或哪个判定？（例如 `filesystem/read_file` 被 `**/.ssh/**` 拒了）
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why is it fine?
+      description: 说明为什么这次的调用是合理的。**不需要贴真实路径**，讲清结构就行。
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: ratchet version
+      description: "`ratchet version` 的输出"
+    validations:
+      required: true
