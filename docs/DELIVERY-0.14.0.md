@@ -364,6 +364,37 @@ Smithery 现在只支持三种 release 类型（`PUT /servers/{qualifiedName}/re
 的定位有张力，需要产品决策）。
 
 倾向 A：Smithery 的流量值得要，但不值得为它改产品形态。
+
+### A 方案执行记录（2026-09-20）
+
+**产物已经做出来了**：`scripts/build-mcpb.sh` 从 v0.12.0 的 release 产物打出
+`dist/ratchet-0.12.0.mcpb`（5.7 MB），包内 `manifest.json`（manifest_version 0.3）+
+`server/ratchet` 启动器 + 四平台二进制。
+
+三项本地实测（不是"应该能用"）：
+
+1. `manifest.json` 是合法 JSON，字段与 modelcontextprotocol/mcpb 的 MANIFEST.md 一致；
+2. 启动器按 `uname` 选对二进制：`./server/ratchet --version` → `ratchet 0.12.0`；
+3. **stdio 握手成功**：发 `initialize` 返回正规 JSON-RPC 结果，带 `tools` 能力。
+
+（顺带发现一个 bug：握手返回的 `serverInfo.version` 是 **0.9.0**，与二进制 0.12.0 不一致——
+MCP server 里硬编码的版本号没跟上，下次发版要改。）
+
+**卡在最后一跳：Smithery 的 release 请求体没有公开 schema。**
+
+- 文档只给了响应结构（DeployResponse），没给请求结构（DeployPayload）；
+  `https://app.stainless.com/api/spec/documented/smithery/openapi.documented.yml` 取回来是空的；
+  `api.smithery.ai/openapi.json` 等常见路径都是 404。
+- 用探测法问出了一条线索：payload 为 `{"type":"stdio","mcpb":{"type":"binary"}}` 时，
+  校验器回 **`Invalid option: expected one of "node"|"binary"|"python"|"bun"`**
+  ——说明请求体里有某个字段要求这个枚举，但字段名/层级还没问到；其余形状一律回笼统的 `Invalid input`。
+- CLI 这条路也不通：`@smithery/cli` v4 只有 `mcp/tool/skill/auth/namespace`，**没有 publish**。
+- 控制台入口 `https://smithery.ai/servers/new` 在内置浏览器里是**未登录**状态（页面给的是 Login 链接），
+  所以也驱动不了。
+
+**结论**：包是好的、接口是通的（能回具体校验错误），缺的只是"请求体长什么样"。两条收尾路径：
+① 在内置浏览器里登录一次 Smithery，我直接走控制台的上传流程（最省事）；
+② 你在控制台手动发起一次发布，把浏览器开发者工具里那个 PUT 的 payload 复制给我。
 ## 8. 这一轮之后的判据
 
 按 GTM 的止损线看，接下来两周要盯的是三个数，不是 star：
