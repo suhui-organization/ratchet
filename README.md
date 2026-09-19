@@ -66,9 +66,29 @@ python3 verify.py ./delivery
 
 ## 状态
 
-**0.1.0 — 走的通的最小骨架**：策略编译与验证链路已实现且有测试，
-真实环境扫描（读 harness 配置、MCP introspection）尚未实现，输入是清单文件。
-详见 [docs/PLAN.md](docs/PLAN.md)。
+**0.12.0 — developer preview，链路已经整条打通**（本机实测：16 个 MCP server、
+12 个未锁版本、164 个工具、策略 allow 43 / approve 106 / deny 15）：
+
+| 命令 | 做什么 |
+|---|---|
+| `ratchet scan [--introspect] [--share page.html]` | 读 harness 配置列出 MCP server（只读，不执行）；加 `--introspect` 才连上去列工具 |
+| `ratchet ingest` / `observe` | 采集真实调用（hook 出错静默退出），并对照清单看出哪些工具从没被用过 |
+| `ratchet policy draft` / `check` | 编译三态策略（每条带判定依据），并试跑一次假设调用 |
+| `ratchet deliver` / `report build` | 一条命令出交付目录：策略 + 报告 + sha256 清单 |
+| `ratchet mcp` | 以 stdio MCP server 形态跑（`ratchet_scan` / `ratchet_policy` / `ratchet_check`） |
+| `ratchet feedback` | 把去标识化结果整理成 issue 正文供你复制；**没有遥测，不会自动发** |
+
+拿到它的方式：`curl -fsSL https://github.com/suhui-organization/ratchet/releases/latest/download/install.sh | sh`、
+`brew install suhui-organization/tap/ratchet`、容器 `ghcr.io/suhui-organization/ratchet`，
+或官方 MCP Registry 里的 `io.github.iversonwuwei/ratchet`。
+
+**清楚的边界**：能力判定是名称/描述的启发式，会**双向出错**（仓里有两条已知误判的测试）；
+它不是沙箱、运行时不拦调用；判定不了的会单独列出来请人确认，而不是猜一个结论。
+详见 [docs/PLAN.md](docs/PLAN.md) 与 [docs/DELIVERY-0.14.0.md](docs/DELIVERY-0.14.0.md)。
+
+## 许可证
+
+Apache-2.0，见 [LICENSE](LICENSE)。
 
 ## 开发
 
