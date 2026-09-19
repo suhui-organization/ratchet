@@ -25,7 +25,7 @@ import (
 	"github.com/suhui-organization/ratchet/internal/store"
 )
 
-const version = "0.8.0"
+const version = "0.8.1"
 
 // InventoryFormat 是本工具认识的清单格式标识。
 const InventoryFormat = "ratchet-inventory/v1"
@@ -69,6 +69,7 @@ func usage() {
   ratchet policy draft --from <清单.json> [--out <策略.json>]
                        [--agent <名字>] [--strict-unknown] [--only-observed]
                        [--lang en-US|zh-CN] [--json]
+  ratchet policy check --policy <策略.json>    # 从 stdin 读一次调用试跑
 
 说明：
   scan          只读本机配置，列出装了哪些 agent、挂了哪些 MCP server。
@@ -77,6 +78,11 @@ func usage() {
 
   policy draft  读工具清单，编译出最小权限策略；每条判定都带依据。
                 未登记的工具一律拒绝；无法判定能力的默认置为 approve 并列入待确认。
+                带路径参数的工具会额外挂上敏感路径黑名单（.env / .ssh / 凭据等）。
+
+  policy check  拿一次**假设的调用**试跑：先看参数约束，再看三态。
+                写完规则后"会不会挡掉正常调用"是唯一要紧的问题，试一次比读 JSON 可靠。
+                stdin: {"server":"…","tool":"…","args":{"path":"/workspace/x"}}
 
   observe       把真实调用记录对到清单上：哪些在用、哪些从未被用过、
                 哪些**不在清单里却被调用过**（清单不全或有人绕过配置）。
@@ -94,6 +100,86 @@ func usage() {
   --lang            产物语言（默认 en-US）；CLI 自身的终端输出暂为中文
   --json            把策略 JSON 打到 stdout（不给 --out 时也能用管道接）
 `)
+}
+
+// cmdPolicyCheck 拿一次**假设的调用**试跑策略。
+//
+// 存在的意义：写完规则之后，"这会不会把我正常的工作流挡掉"是唯一要紧的问题。
+// 拿真实调用试一次，比读一遍 JSON 可靠得多。
+//
+// stdin 形状：{"server":"filesystem","tool":"read_file","args":{"path":"/workspace/x"}}
+func cmdPolicyCheck(args []string) int {
+	fs := flag.NewFlagSet("policy check", flag.ContinueOnError)
+	policyPath := fs.String("policy", "", "策略文件（必填）")
+	asJSON := fs.Bool("json", false, "输出机器可读结果")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if *policyPath == "" {
+		fmt.Fprintln(os.Stderr, "缺少 --policy：需要一份策略文件")
+		return 2
+	}
+	raw, err := os.ReadFile(*policyPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "读策略失败：%v\n", err)
+		return 1
+	}
+	var p model.Policy
+	if err := json.Unmarshal(raw, &p); err != nil {
+		fmt.Fprintf(os.Stderr, "策略文件不是合法 JSON：%v\n", err)
+		return 1
+	}
+
+	callRaw, err := io.ReadAll(io.LimitReader(os.Stdin, 1<<20))
+	if err != nil || len(callRaw) == 0 {
+		fmt.Fprintln(os.Stderr, "从 stdin 读不到调用。形状：{\"server\":\"…\",\"tool\":\"…\",\"args\":{…}}")
+		return 2
+	}
+	var call struct {
+		Server string            `json:"server"`
+		Tool   string            `json:"tool"`
+		Args   map[string]string `json:"args"`
+	}
+	if err := json.Unmarshal(callRaw, &call); err != nil {
+		fmt.Fprintf(os.Stderr, "调用不是合法 JSON：%v\n", err)
+		return 2
+	}
+	if call.Server == "" || call.Tool == "" {
+		fmt.Fprintln(os.Stderr, "调用缺少 server 或 tool")
+		return 2
+	}
+
+	three := policy.Verdict(p, call.Server, call.Tool)
+	decision, violations := policy.Evaluate(p, call.Server, call.Tool, call.Args)
+
+	if *asJSON {
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		enc.SetEscapeHTML(false)
+		_ = enc.Encode(map[string]any{
+			"call":       call,
+			"verdict":    three,
+			"decision":   decision,
+			"violations": violations,
+		})
+		return 0
+	}
+
+	fmt.Printf("ratchet %s — 单次调用试跑\n\n", version)
+	fmt.Printf("  调用        %s/%s\n", call.Server, call.Tool)
+	fmt.Printf("  三态判定    %s\n", three)
+	if len(violations) == 0 {
+		fmt.Printf("  参数约束    无命中\n")
+	} else {
+		for _, v := range violations {
+			fmt.Printf("  参数约束    %s = %q → %s（规则 %s）\n", v.ArgKey, v.Value, v.Reason, v.Rule)
+		}
+	}
+	fmt.Printf("  最终结论    %s\n", decision)
+	if decision != three {
+		fmt.Printf("              ↑ 参数约束把它从 %s 收成了 %s\n", three, decision)
+	}
+	return 0
 }
 
 func cmdObserve(args []string) int {
@@ -431,8 +517,12 @@ func riskMark(s discover.Server) string {
 }
 
 func cmdPolicy(args []string) int {
+	if len(args) > 0 && args[0] == "check" {
+		return cmdPolicyCheck(args[1:])
+	}
 	if len(args) == 0 || args[0] != "draft" {
 		fmt.Fprintln(os.Stderr, "用法：ratchet policy draft --from <清单.json> [--out <策略.json>]")
+		fmt.Fprintln(os.Stderr, "     ratchet policy check --policy <策略.json>   # 从 stdin 读一次调用试跑")
 		return 2
 	}
 	fs := flag.NewFlagSet("policy draft", flag.ContinueOnError)

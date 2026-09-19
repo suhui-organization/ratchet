@@ -125,6 +125,56 @@ type Violation struct {
 	Reason string
 }
 
+// Verdict 查一次调用在**三态层面**的结论（不含参数约束）。
+//
+// 策略文件里只有三个列表，没有"查一次调用"的入口——而网关、报告、
+// 试跑工具都需要同一个答案，所以判定只能有一份。
+// 未登记的工具落到 defaultDecision（编译期固定为 deny）。
+func Verdict(p model.Policy, server, tool string) model.Decision {
+	rules, ok := p.Servers[server]
+	if !ok {
+		return defaultOf(p)
+	}
+	if contains(rules.Deny, tool) {
+		return model.Deny
+	}
+	if contains(rules.Approve, tool) {
+		return model.Approve
+	}
+	if contains(rules.Allow, tool) {
+		return model.Allow
+	}
+	return defaultOf(p)
+}
+
+func defaultOf(p model.Policy) model.Decision {
+	if p.DefaultDecision == "" {
+		return model.Deny // 缺省即拒绝：策略文件写坏了也不该放行
+	}
+	return p.DefaultDecision
+}
+
+func contains(list []string, v string) bool {
+	for _, x := range list {
+		if x == v {
+			return true
+		}
+	}
+	return false
+}
+
+// Evaluate 是给使用者的最终入口：先看参数约束，再看三态。
+//
+// 顺序不可颠倒：命中黑名单的调用不能因为"工具本身是 allow"就放行——
+// 读 `.env` 的正是那个被标成 allow 的 read_file。
+func Evaluate(p model.Policy, server, tool string, args map[string]string) (model.Decision, []Violation) {
+	v := CheckArgs(p, server, tool, args)
+	if len(v) > 0 {
+		return model.Deny, v
+	}
+	return Verdict(p, server, tool), nil
+}
+
 // CheckArgs 对一次调用的参数做约束判定。返回 nil 表示没有违规（放行到三态判定）。
 //
 // 这是**纯函数**：同样的策略、工具、参数，永远得到同样的结论。

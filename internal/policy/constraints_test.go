@@ -125,3 +125,43 @@ func containsStr(h, n string) bool {
 	}
 	return false
 }
+
+func TestVerdictLooksUpTheThreeLists(t *testing.T) {
+	p := model.Policy{DefaultDecision: model.Deny, Servers: map[string]model.ServerRules{
+		"fs": {Allow: []string{"read_file"}, Approve: []string{"write_file"}, Deny: []string{"delete_file"}},
+	}}
+	cases := map[string]model.Decision{
+		"read_file": model.Allow, "write_file": model.Approve, "delete_file": model.Deny,
+		"unknown_tool": model.Deny, // 未登记 → 默认决策
+	}
+	for tool, want := range cases {
+		if got := Verdict(p, "fs", tool); got != want {
+			t.Errorf("%s → %s，期望 %s", tool, got, want)
+		}
+	}
+	if got := Verdict(p, "no_such_server", "read_file"); got != model.Deny {
+		t.Errorf("未知 server 应落到默认决策，实际 %s", got)
+	}
+}
+
+func TestDefaultDecisionNeverMeansAllow(t *testing.T) {
+	// 策略文件缺了 defaultDecision 时也必须拒绝——写坏了不等于放行
+	p := model.Policy{Servers: map[string]model.ServerRules{}}
+	if got := Verdict(p, "fs", "read_file"); got != model.Deny {
+		t.Fatalf("缺省决策应为 deny，实际 %s", got)
+	}
+}
+
+func TestEvaluateConstraintsBeatAllow(t *testing.T) {
+	// 顺序不可颠倒：read_file 是 allow，但读 .env 必须拒——
+	// 命中黑名单的调用不能因为"工具本身放行"就放行
+	p := policyWithPaths(nil, SensitivePathDeny)
+	dec, v := Evaluate(p, "filesystem", "read_file", map[string]string{"path": "/ws/.env"})
+	if dec != model.Deny || len(v) == 0 {
+		t.Fatalf("命中黑名单应判 deny，实际 %s %+v", dec, v)
+	}
+	dec, v = Evaluate(p, "filesystem", "read_file", map[string]string{"path": "/ws/main.go"})
+	if dec != model.Allow || v != nil {
+		t.Fatalf("正常路径应放行，实际 %s %+v", dec, v)
+	}
+}

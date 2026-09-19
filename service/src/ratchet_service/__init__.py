@@ -7,4 +7,4 @@
 - 其余模块（manifest / compliance / cli）—— 出具方用，可以自由依赖。
 """
 
-__version__ = "0.8.0"
+__version__ = "0.8.1"
