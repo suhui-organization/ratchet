@@ -8,7 +8,7 @@
 
 export const site = {
   name: 'Ratchet',
-  version: '0.8.1',
+  version: '0.9.0',
   tagline: {
     eyebrow: 'Developer preview',
     title: 'Privileges are compiled, not hand-written.',

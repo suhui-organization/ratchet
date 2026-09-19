@@ -19,13 +19,14 @@ import (
 	"github.com/suhui-organization/ratchet/internal/discover"
 	"github.com/suhui-organization/ratchet/internal/hook"
 	"github.com/suhui-organization/ratchet/internal/mcp"
+	"github.com/suhui-organization/ratchet/internal/mcpserver"
 	"github.com/suhui-organization/ratchet/internal/model"
 	"github.com/suhui-organization/ratchet/internal/observe"
 	"github.com/suhui-organization/ratchet/internal/policy"
 	"github.com/suhui-organization/ratchet/internal/store"
 )
 
-const version = "0.8.1"
+const version = "0.9.0"
 
 // InventoryFormat 是本工具认识的清单格式标识。
 const InventoryFormat = "ratchet-inventory/v1"
@@ -46,6 +47,12 @@ func main() {
 		os.Exit(cmdObserve(os.Args[2:]))
 	case "ingest":
 		os.Exit(cmdIngest(os.Args[2:]))
+	case "mcp":
+		// 以 stdio MCP server 运行（供 MCP 客户端与官方 Registry 收录）
+		if err := mcpserver.Serve(os.Stdin, os.Stdout, os.Stderr); err != nil {
+			fmt.Fprintf(os.Stderr, "ratchet mcp: %v\n", err)
+			os.Exit(1)
+		}
 	case "help", "--help", "-h":
 		usage()
 	default:
@@ -66,6 +73,7 @@ func usage() {
                   [--out <清单.json>] [--json]
   ratchet ingest [--hook auto|codex|claude-code|generic] [--store <路径>]
                  [--server <名>] [--agent <名>]
+  ratchet mcp                                  # 以 stdio MCP server 运行
   ratchet policy draft --from <清单.json> [--out <策略.json>]
                        [--agent <名字>] [--strict-unknown] [--only-observed]
                        [--lang en-US|zh-CN] [--json]
@@ -94,6 +102,10 @@ func usage() {
 
                 Claude Code 的 MCP 工具名是 mcp__<server>__<tool>，会被拆成真实来源；
                 PermissionDenied 事件记为 deny/blocked——那是 agent **想做但被拦下**的事。
+
+  mcp           以 stdio MCP server 运行，暴露三个只读工具：
+                ratchet_scan / ratchet_policy / ratchet_check。
+                让 agent 自己能问"我现在能碰什么"；也是官方 Registry 收录的前提。
 
   --strict-unknown  无法判定能力的工具直接 deny（默认是 approve + 待确认）
   --only-observed   只授予被观测到调用过的工具（最小权限最严格的一档）
