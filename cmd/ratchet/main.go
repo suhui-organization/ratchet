@@ -25,7 +25,7 @@ import (
 	"github.com/suhui-organization/ratchet/internal/store"
 )
 
-const version = "0.6.2"
+const version = "0.7.0"
 
 // InventoryFormat 是本工具认识的清单格式标识。
 const InventoryFormat = "ratchet-inventory/v1"
@@ -64,7 +64,8 @@ func usage() {
                [--out <清单.json>] [--timeout <秒>] [--json]
   ratchet observe --calls <调用记录.jsonl> [--inventory <清单.json>]
                   [--out <清单.json>] [--json]
-  ratchet ingest [--hook codex] [--store <路径>] [--server <名>] [--agent <名>]
+  ratchet ingest [--hook auto|codex|claude-code|generic] [--store <路径>]
+                 [--server <名>] [--agent <名>]
   ratchet policy draft --from <清单.json> [--out <策略.json>]
                        [--agent <名字>] [--strict-unknown] [--only-observed]
                        [--lang en-US|zh-CN] [--json]
@@ -80,9 +81,13 @@ func usage() {
   observe       把真实调用记录对到清单上：哪些在用、哪些从未被用过、
                 哪些**不在清单里却被调用过**（清单不全或有人绕过配置）。
 
-  ingest        从 stdin 读一条 agent 事件（Codex PostToolUse），追加进本地调用记录。
-                挂成 hook 后每次工具调用都会记一行；解析失败静默退出，**绝不阻塞 agent**。
-                默认只记 server/tool，不记工具参数（参数里常含密钥与文件内容）。
+  ingest        从 stdin 读一条 agent 事件，追加进本地调用记录。默认 auto：
+                按 payload 形状认出 Codex / Claude Code，认不出按 generic
+                （{"server","tool"} 两个字段即可）。解析失败静默退出，**绝不阻塞 agent**。
+                默认只记 server/tool，不记工具参数（那里常含密钥与文件内容）。
+
+                Claude Code 的 MCP 工具名是 mcp__<server>__<tool>，会被拆成真实来源；
+                PermissionDenied 事件记为 deny/blocked——那是 agent **想做但被拦下**的事。
 
   --strict-unknown  无法判定能力的工具直接 deny（默认是 approve + 待确认）
   --only-observed   只授予被观测到调用过的工具（最小权限最严格的一档）
@@ -166,23 +171,18 @@ func cmdObserve(args []string) int {
 // 所以任何异常都安静地退出 0。
 func cmdIngest(args []string) int {
 	fs := flag.NewFlagSet("ingest", flag.ContinueOnError)
-	hookName := fs.String("hook", "codex", "事件来源（目前支持 codex）")
+	hookName := fs.String("hook", "auto", "事件来源：auto / codex / claude-code / generic")
 	storePath := fs.String("store", "", "调用记录文件路径（默认 $RATCHET_HOME/calls.jsonl）")
 	server := fs.String("server", "", "覆盖 server 名（默认 codex-tools）")
 	agent := fs.String("agent", "", "覆盖 agent 名（默认 codex）")
 	if err := fs.Parse(args); err != nil {
 		return 0
 	}
-	if *hookName != "codex" {
-		fmt.Fprintf(os.Stderr, "不支持的事件来源：%s（目前只有 codex）\n", *hookName)
-		return 0
-	}
-
 	raw, err := io.ReadAll(io.LimitReader(os.Stdin, 1<<20))
 	if err != nil {
 		return 0
 	}
-	call, ok := hook.FromCodex(raw, *server, *agent)
+	call, ok := hook.Translate(raw, hook.ParseHarness(*hookName), *server, *agent)
 	if !ok {
 		return 0
 	}

@@ -42,15 +42,24 @@ func FromCodex(raw []byte, server, agent string) (observe.Call, bool) {
 	if tool == "" {
 		return observe.Call{}, false
 	}
-	// 已过网关的 MCP 工具：网关侧会记一次，这里再记就重复了
-	if strings.HasPrefix(tool, "mcp__") || strings.HasPrefix(tool, "ratchet__") {
+	// 只有我们自己网关记过的调用才跳过（否则会重复计一次）
+	if strings.HasPrefix(tool, "ratchet__") {
 		return observe.Call{}, false
 	}
-	if server == "" {
-		server = DefaultServer
+
+	call := observe.Call{Agent: orDefault(agent, "codex")}
+	if s, name, ok := splitMCPTool(tool); ok {
+		// MCP 工具：名字里带着真实来源，直接拆开记。
+		// （早先这里是把 mcp__ 全跳过的——那是假定网关会记一份；
+		//   但 ratchet 现在没有网关，跳过等于把这些调用整段丢掉。）
+		call.Server, call.Tool = s, name
+	} else {
+		call.Server, call.Tool = orDefault(server, DefaultServer), tool
 	}
-	if agent == "" {
-		agent = "codex"
+	if server != "" {
+		call.Server = server // 显式覆盖：把多个 agent 归到同一策略下
 	}
-	return observe.Call{Server: server, Tool: tool, Agent: agent}, true
+	call.Decision = "allow"
+	call.Outcome = "ok"
+	return call, true
 }

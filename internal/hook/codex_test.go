@@ -37,9 +37,11 @@ func TestFromCodexNeverKeepsToolInput(t *testing.T) {
 	}
 }
 
-func TestFromCodexSkipsGatewayToolsAndBadInput(t *testing.T) {
+func TestFromCodexSkipsOnlyOurOwnGatewayAndBadInput(t *testing.T) {
+	// 只有我们自己网关记过的调用才跳过。
+	// mcp__ 工具**不再跳过**：早先那是假定网关会另记一份，
+	// 但 ratchet 现在没有网关，跳过等于把这些调用整段丢掉。
 	for _, raw := range []string{
-		`{"tool_name":"mcp__filesystem__read_file"}`,
 		`{"tool_name":"ratchet__read_file"}`,
 		`{"tool_name":""}`,
 		`{"hook_event_name":"PostToolUse"}`,
@@ -48,6 +50,19 @@ func TestFromCodexSkipsGatewayToolsAndBadInput(t *testing.T) {
 		if _, ok := FromCodex([]byte(raw), "", ""); ok {
 			t.Errorf("不该记录：%s", raw)
 		}
+	}
+}
+
+func TestFromCodexRecordsMCPToolsWithRealSource(t *testing.T) {
+	call, ok := FromCodex([]byte(`{"tool_name":"mcp__filesystem__read_file"}`), "", "")
+	if !ok {
+		t.Fatal("MCP 工具应被记录")
+	}
+	if call.Server != "filesystem" || call.Tool != "read_file" {
+		t.Fatalf("没有拆出真实来源：%+v", call)
+	}
+	if call.Decision != "allow" || call.Outcome != "ok" {
+		t.Fatalf("状态 = %s/%s", call.Decision, call.Outcome)
 	}
 }
 
