@@ -13,6 +13,8 @@ on:
 
 permissions:
   contents: write
+  # 推 GHCR 需要它；只写 contents 的话镜像会推不上去
+  packages: write
 
 jobs:
   release:
@@ -58,3 +60,42 @@ jobs:
           files: dist/release/*
           generate_release_notes: true
           fail_on_unmatched_files: true
+
+      # 容器镜像：官方 Registry 只认 npm / PyPI / OCI / NuGet / mcpb 这些来源，
+      # GitHub Release 不在其列——所以镜像不是"顺便发一个"，而是收录的前置条件。
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=raw,value=latest
+            type=ref,event=tag
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      # 收录前先自证这个镜像真的能当 MCP server 用：
+      # 起一次、完成 initialize 握手、退出。握手失败就别指望 Registry 会收。
+      - name: Smoke-test the published image
+        run: |
+          set -euo pipefail
+          IMAGE="ghcr.io/${{ github.repository }}:latest"
+          OUT=$(printf '%s\n' \
+            '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"ci","version":"1"}}}' \
+            | timeout 60 docker run -i --rm "$IMAGE" 2>/dev/null || true)
+          echo "$OUT"
+          echo "$OUT" | grep -q '"serverInfo"' || { echo "❌ 镜像没有回应 initialize"; exit 1; }
+          echo "✅ 镜像能完成 MCP 握手"

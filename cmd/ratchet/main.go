@@ -26,7 +26,7 @@ import (
 	"github.com/suhui-organization/ratchet/internal/store"
 )
 
-const version = "0.9.0"
+const version = "0.10.0"
 
 // InventoryFormat 是本工具认识的清单格式标识。
 const InventoryFormat = "ratchet-inventory/v1"

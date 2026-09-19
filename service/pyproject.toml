@@ -1,6 +1,6 @@
 [project]
 name = "ratchet-service"
-version = "0.9.0"
+version = "0.10.0"
 description = "Ratchet 交付物侧：sha256 清单、合规映射、以及只用标准库的独立验证器"
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
