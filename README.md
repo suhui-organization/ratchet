@@ -12,6 +12,12 @@ macOS / Linux 上也可以用 Homebrew（formula 钉住每个平台的 sha256）
 brew install suhui-organization/tap/ratchet
 ```
 
+**Claude Desktop 用户**可以直接装本地 server（一键安装包，不需要命令行）：
+
+下载 [ratchet-0.12.0.mcpb](https://github.com/suhui-organization/ratchet/releases/latest/download/ratchet-0.12.0.mcpb)
+并打开它，Claude Desktop 会完成安装。包内是四个平台的原生二进制 + 一份 `manifest.json`
+（MCPB 规范），**不需要 Node 或 Python 运行时**。
+
 Linux / macOS（amd64 · arm64）。装完先跑这一条——**只读配置，不执行任何东西**：
 
 ```bash

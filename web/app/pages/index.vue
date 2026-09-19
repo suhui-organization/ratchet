@@ -216,6 +216,14 @@ const steps = [
           <a href="#how" class="text-brand hover:text-brand-ink hover:underline">How it works</a>
         </div>
 
+        <p class="mt-5 text-[13px] leading-relaxed text-faint">
+          On Claude Desktop?
+          <a :href="site.desktopBundleUrl" class="text-brand hover:text-brand-ink hover:underline">
+            Download the one-click bundle ({{ site.version }}, .mcpb)
+          </a>
+          — the same server, installed without a terminal.
+        </p>
+
         <div class="mt-10 grid gap-5 text-left sm:grid-cols-2">
           <div v-for="b in blocks" :key="'x-' + b.key" class="overflow-hidden rounded-xl bg-code">
             <div class="flex items-center justify-between border-b border-white/10 px-4 py-2.5">

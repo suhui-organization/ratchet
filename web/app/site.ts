@@ -26,6 +26,13 @@ export const site = {
    * 产物由 `make dist` 生成，把 dist/ 与 install.sh 放在同一个目录即可。
    */
   installUrl: 'https://github.com/suhui-organization/ratchet/releases/latest/download',
+  /**
+   * Claude Desktop 的 MCPB 一键安装包（同一个 release 里的附件）。
+   * 这是转化路径最短的一条：下载 → 打开 → 装好，不碰终端。
+   * 文件名带版本号，所以发新版时这里要跟着改（和上面 installUrl 同一批产物）。
+   */
+  desktopBundleUrl:
+    'https://github.com/suhui-organization/ratchet/releases/latest/download/ratchet-0.12.0.mcpb',
   /** 无下载地址时的联系入口。 */
   contactUrl: 'mailto:iverson.wuwei@gmail.com?subject=Ratchet%20access',
   /** 页面上显示的联系邮箱（必须与 contactUrl 指向同一个信箱）。 */
