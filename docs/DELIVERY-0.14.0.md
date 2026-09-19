@@ -116,6 +116,35 @@ $ curl .../v0/servers/io.github.iversonwuwei%2Fratchet/versions
 | 1 | 在线上点一次 `Buy the audit`，确认 Paddle overlay 能弹出 | 你（需要真实浏览器） |
 | 2 | 按渠道清单发第一批内容（目录已就位，顺序：先目录后社交） | 你 / 我出文案 |
 | 3 | 轮换对话里出现过的 Vercel token 与服务器密码 | 你 |
+
+## 9. 第一波：目录收录（GTM 第 3 节，先目录后社交）
+
+| 渠道 | 动作 | 结果 |
+|---|---|---|
+| **awesome-mcp-servers**（95k star） | PR 加进 🔒 Security 段，标题带 `🤖🤖🤖`（该清单给自动化提交留了快速通道） | [PR #14700](https://github.com/punkpeye/awesome-mcp-servers/pull/14700)，open / mergeable |
+| **awesome-ai-security-tools** | 按他们的门槛（零 star、仓库太新的先不放主列表）提交到 WATCHLIST | [PR #117](https://github.com/scadastrangelove/awesome-ai-security-tools/pull/117)，open / mergeable |
+| **Glama** | 加 `glama.json`（`maintainers: ["iversonwuwei"]`，schema 从 Glama 官方端点取的） | 待提交收录，见下 |
+| **Homebrew tap** | 补 README：装什么、数字什么意思、**它不是什么** | 已推 `suhui-organization/homebrew-tap` |
+
+### 途中修掉的两个真问题
+
+1. **仓库没有 LICENSE 文件，但站点页脚与镜像 label 都写着 Apache-2.0。**
+   等于对外声明了一件没有对应授权文件的事。已补 Apache-2.0 全文（`LICENSE`，202 行）。
+   这一条是被 awesome-ai-security-tools 的收录门槛照出来的：他们明确要求"有清晰的根许可证"。
+2. **README 的"状态"还停在 0.1.0**，写着"真实环境扫描尚未实现"——和刚跑出来的实测
+   （16 server / 12 未锁 / 164 工具）直接矛盾。已按 0.12.0 的实况重写，并把边界写清楚。
+
+### Glama 这一步卡在哪
+
+awesome-mcp-servers 的机器人要求：先用 Dockerfile 在 Glama 上把 server 跑通、通过
+introspection 检查，再把 Glama 分数徽章加到条目里。现状：
+
+- 徽章地址能取到，但内容是 `This MCP server is not listed on Glama` —— 即还没收录；
+- 提交入口 `https://glama.ai/mcp/servers` 需要以 GitHub 账号登录（我这边没有你的会话）；
+- 我们的 `Dockerfile` 默认 `CMD ["mcp"]`，起来就是一个 stdio MCP server，符合
+  "能启动并响应 introspection" 这条要求，不需要额外改造。
+
+所以这一步只差一次人工提交，提交完我把徽章补进 PR（机器人会重新检查）。
 ## 8. 这一轮之后的判据
 
 按 GTM 的止损线看，接下来两周要盯的是三个数，不是 star：
