@@ -9,11 +9,22 @@ Registry 要求"存在公开可取用的制品"。我们用 OCI（GHCR），
 但 **GitHub 建的 package 默认私有**，即使仓库公开。
 
 ```bash
-# 不带任何凭据验证（200 = 公开；401/403 = 还是私有，发布会被拒）
+# 正确的判据：匿名能不能换到 pull token（200 且返回里有 token = 公开）
 curl -s -o /dev/null -w '%{http_code}\n' \
+  "https://ghcr.io/token?scope=repository:suhui-organization/ratchet:pull&service=ghcr.io"
+
+# 拿到 token 再取 manifest，应当 200
+TOK=$(curl -s "https://ghcr.io/token?scope=repository:suhui-organization/ratchet:pull&service=ghcr.io" \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["token"])')
+curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $TOK" \
   -H 'Accept: application/vnd.oci.image.index.v1+json' \
   https://ghcr.io/v2/suhui-organization/ratchet/manifests/latest
 ```
+
+> **曾经写错的地方**：这段以前是"直接请求 manifest，200 = 公开、401 = 私有"。
+> 实际上 GHCR 对**任何**未带 token 的 manifest 请求都先回 401 + `WWW-Authenticate`，
+> 客户端拿到后再去换匿名 token——公开包也是这个流程。按旧写法会把一个正常的公开包
+> 判成私有（2026-09-19 实测：直连 401、换 token 后 200）。判公开性只看 token 那一步。
 
 改成公开（两次点击，只能由账号持有人做）：
 

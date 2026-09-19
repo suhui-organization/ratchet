@@ -7,7 +7,7 @@
 
 | # | 计划里的事 | 状态 | 落点 |
 |---|---|---|---|
-| 2.1 | Registry 重发到 0.12.0 | 卡片已开：等 GitHub 设备授权后立刻 publish | `server.json`（version 0.12.0 / identifier `v0.12.0`） |
+| 2.1 | Registry 重发到 0.12.0 | **已发布**（见 §7） | `server.json`（version 0.12.0 / identifier `v0.12.0`） |
 | 2.2 | 定价页接上真实收款 | **已上线**（见 §4 验收） | `web/app/pages/pricing.vue`、`web/app/utils/paddle.ts`、`web/app/pages/thanks.vue` |
 | 2.3 | 内容资产补到 4 篇 | 已完成 02/03/04 | `docs/content/02-pinning-reality.en.md`、`03-tool-surface.en.md`、`04-answer-the-question.en.md` |
 | 2.4 | 首页补"10 秒出数字"钩子 | **已上线** | `web/app/pages/index.vue` 的 `#after` 段 |
@@ -84,11 +84,38 @@ successUrl 拼接都能在 node 环境直接测，不需要 Nuxt 运行时，也
 合成一条命令。这次发布正好证明它有用——VPN 中间断过一次，重连后一条命令补完，
 不用再手敲三次 ssh。
 
-## 7. 未完成
+## 7. Registry 已重发到 0.12.0
 
-| # | 事项 | 卡点 | 下一步 |
-|---|---|---|---|
-| 1 | Registry 重发 0.12.0 | 需要 GitHub 设备授权（JWT 寿命很短，授权后必须立刻 publish） | 设备码已生成，点完立刻 publish |
+官方 Registry 上现在是最新版本，第三方目录（Smithery / PulseMCP / GitHub Registry）随之级联：
+
+```
+$ mcp-publisher publish
+✓ Server io.github.iversonwuwei/ratchet version 0.12.0
+
+$ curl .../v0/servers/io.github.iversonwuwei%2Fratchet/versions
+0.12.0 | ghcr.io/suhui-organization/ratchet:v0.12.0 | 2026-09-19T11:20:53Z
+0.11.0 | ghcr.io/suhui-organization/ratchet:v0.11.0 | ...
+```
+
+途中两个真实故障，都记下来了：
+
+1. **设备授权要连点两次**：第一次授权成功后，轮询被网络重置（这台机器到 GitHub 一直不稳），
+   token 没落盘、码作废。第二次把 Go 的 HTTP/2 关掉（`GODEBUG=http2client=0`）才走完。
+   再遇到 `TLS handshake timeout` / `connection reset`，先试这个开关，然后直接重试 publish——
+   它幂等。
+2. **公开性判据写错过**：GHCR 对未带 token 的 manifest 请求一律先回 401（正常握手），
+   旧文档却把它当成"包是私有的"。已改成用匿名 token 端点判断，见
+   [publishing-to-mcp-registry.md](publishing-to-mcp-registry.md)。
+
+## 8. 未完成
+
+到这一版为止，第二节四件事全部完成。剩下的是**发出去**，以及只有你能做的动作：
+
+| # | 事项 | 谁做 |
+|---|---|---|
+| 1 | 在线上点一次 `Buy the audit`，确认 Paddle overlay 能弹出 | 你（需要真实浏览器） |
+| 2 | 按渠道清单发第一批内容（目录已就位，顺序：先目录后社交） | 你 / 我出文案 |
+| 3 | 轮换对话里出现过的 Vercel token 与服务器密码 | 你 |
 ## 8. 这一轮之后的判据
 
 按 GTM 的止损线看，接下来两周要盯的是三个数，不是 star：
