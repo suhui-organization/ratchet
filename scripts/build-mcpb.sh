@@ -33,7 +33,9 @@ echo "==> 拉取 ${TAG} 的产物"
 for p in $PLATFORMS; do
   asset="ratchet_${VERSION}_${p}.tar.gz"
   echo "    $asset"
-  curl -fsSL -o "$STAGE/$asset" "$RELEASE_BASE/$asset"
+  # 这台机器到 github.com 经常中断（实测：一次 4 个产物里会挂掉一个），所以必须带重试，
+  # 否则 set -e 会在解包前就把整轮构建掀掉。
+  curl -fsSL --retry 5 --retry-delay 3 --retry-all-errors -o "$STAGE/$asset" "$RELEASE_BASE/$asset"
   tar -xzf "$STAGE/$asset" -C "$STAGE"
   mv "$STAGE/ratchet" "$STAGE/server/ratchet-${p}"
   chmod 0755 "$STAGE/server/ratchet-${p}"

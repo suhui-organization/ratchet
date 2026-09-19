@@ -31,7 +31,7 @@ echo "从 $BASE 取四个平台并算 sha256…"
 declare -A SHA
 for p in linux_amd64 linux_arm64 darwin_amd64 darwin_arm64; do
   asset="ratchet_${VERSION}_${p}.tar.gz"
-  if ! curl -fsSL --retry 3 --max-time 180 "$BASE/$asset" -o "$TMP/$asset"; then
+  if ! curl -fsSL --http1.1 --retry 6 --retry-delay 3 --retry-all-errors --retry 3 --max-time 180 "$BASE/$asset" -o "$TMP/$asset"; then
     echo "  ❌ 取不到 $asset —— 这个版本还没发布？" >&2
     exit 1
   fi
