@@ -16,7 +16,11 @@
 | Docker 官方 MCP Catalog | 待审 | [PR #5164](https://github.com/docker/mcp-registry/pull/5164)，Docker Desktop 用户可见 |
 | punkpeye/awesome-mcp-servers | 待审 | [PR #14700](https://github.com/punkpeye/awesome-mcp-servers/pull/14700)，机器人要求先有 Glama 徽章 |
 | awesome-ai-security-tools | 待审 | [PR #117](https://github.com/scadastrangelove/awesome-ai-security-tools/pull/117)，按规则进观察名单 |
-| Smithery | 半完成 | **server 记录已建**：`iverson-wuwei/ratchet`（API `PUT /servers/iverson-wuwei/ratchet`）。发布 release 还差一个 **MCPB 包**——见下方说明 |
+| Smithery | 暂缓（判定不适合） | server 记录已建（`iverson-wuwei/ratchet`），但**控制台只收公网 URL**（页面字段：Namespace / Server ID / MCP Server URL），没有 MCPB 上传入口；API 那条路要的请求体没有公开 schema。ratchet 是本地 server，为它改成托管服务会背离产品定位 → 不值得 |
+
+> **MCPB 包的更好去处（2026-09-20 发现）**：MCPB 就是 **Claude Desktop 一键安装本地 server 的格式**。
+> 我们为 Smithery 打的 `dist/ratchet-0.12.0.mcpb` 可以直接作为 release 附件发出去，
+> 让 Claude Desktop 用户一键装上（不需要 Smithery 这个中间人）。这比登进 Smithery 划算得多。
 | PulseMCP | 阻塞 | `/submit` 用 curl 能取到 200，但**内置浏览器导航超时**（bot 防护）。它抓官方 Registry，我们已在那上面，大概率自然收录 |
 | mcp.so | 阻塞 | `/submit` 返回 307 跳登录，需要账号态 |
 | mcpmarket.com | 阻塞 | 同上：curl 200，但**内置浏览器导航超时**（2026-09-20 实测） |

@@ -395,6 +395,32 @@ MCP server 里硬编码的版本号没跟上，下次发版要改。）
 **结论**：包是好的、接口是通的（能回具体校验错误），缺的只是"请求体长什么样"。两条收尾路径：
 ① 在内置浏览器里登录一次 Smithery，我直接走控制台的上传流程（最省事）；
 ② 你在控制台手动发起一次发布，把浏览器开发者工具里那个 PUT 的 payload 复制给我。
+
+### 收尾结果：Smithery 不适合，但 MCPB 包另有更好的去处（2026-09-20）
+
+在内置浏览器里登录 Smithery 后（页面 Login 链接消失），控制台的 "Publish an MCP Server"
+实际只给一种方式：
+
+```
+Namespace*  [iverson-wuwei]
+Server ID*
+MCP Server URL*   ← The HTTP URL where your MCP server is accessible.
+[Continue]
+```
+
+**没有 MCPB 上传入口**——他们的文档里写着 "Local (MCPB Bundle)"，但控制台已经只收公网 HTTP server。
+换句话说：Smithery 要的是"你已经托管好的 server"，而 ratchet 的核心卖点恰恰是**跑在用户自己机器上、数据不出机器**。
+为了进这个目录去托管一个公开服务，是用产品定位换目录曝光，不划算。
+
+**但今天的工没有白费**：MCPB 正是 **Claude Desktop 一键安装本地 MCP server** 的格式。
+我们已经打好的 `dist/ratchet-0.12.0.mcpb` 可以直接作为 GitHub release 附件发布，
+Claude Desktop 用户下载即装——**不需要 Smithery 做中间人**，还保住了"本地运行"的定位。
+
+下一步（优先级高于继续折腾 Smithery）：
+
+1. 把 `.mcpb` 作为 release 资产发出去（`gh release upload` 或 API）；
+2. README 加一行"Claude Desktop: download ratchet-x.y.z.mcpb and open it"；
+3. 落地页的安装段也可以加这个选项（现在只有 curl 与 brew）。
 ## 8. 这一轮之后的判据
 
 按 GTM 的止损线看，接下来两周要盯的是三个数，不是 star：
