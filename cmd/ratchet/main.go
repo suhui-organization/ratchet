@@ -23,10 +23,11 @@ import (
 	"github.com/suhui-organization/ratchet/internal/model"
 	"github.com/suhui-organization/ratchet/internal/observe"
 	"github.com/suhui-organization/ratchet/internal/policy"
+	"github.com/suhui-organization/ratchet/internal/share"
 	"github.com/suhui-organization/ratchet/internal/store"
 )
 
-const version = "0.10.1"
+const version = "0.11.0"
 
 // InventoryFormat 是本工具认识的清单格式标识。
 const InventoryFormat = "ratchet-inventory/v1"
@@ -68,7 +69,7 @@ func usage() {
 用法：
   ratchet version
   ratchet scan [--home <dir>] [--workdir <dir>] [--introspect]
-               [--out <清单.json>] [--timeout <秒>] [--json]
+               [--out <清单.json>] [--share <页面.html>] [--timeout <秒>] [--json]
   ratchet observe --calls <调用记录.jsonl> [--inventory <清单.json>]
                   [--out <清单.json>] [--json]
   ratchet ingest [--hook auto|codex|claude-code|generic] [--store <路径>]
@@ -83,6 +84,7 @@ func usage() {
   scan          只读本机配置，列出装了哪些 agent、挂了哪些 MCP server。
                 默认**不执行任何东西**；加 --introspect 才会连上 server 取工具名
                 （连上就会执行配置里写的命令，所以必须显式开启）。
+                --share 额外写一个自包含 HTML 页面，便于把结果转发给别人。
 
   policy draft  读工具清单，编译出最小权限策略；每条判定都带依据。
                 未登记的工具一律拒绝；无法判定能力的默认置为 approve 并列入待确认。
@@ -345,6 +347,7 @@ func cmdScan(args []string) int {
 	introspect := fs.Bool("introspect", false, "连上每个 server 取工具名（会执行配置里的命令）")
 	out := fs.String("out", "", "把清单写到这个文件（需要 --introspect）")
 	timeout := fs.Int("timeout", 20, "单个 server 的 introspect 超时（秒）")
+	sharePath := fs.String("share", "", "把扫描结果写成一个自包含 HTML 页面（便于转发，无需服务端）")
 	asJSON := fs.Bool("json", false, "把扫描报告打成 JSON")
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -372,6 +375,16 @@ func cmdScan(args []string) int {
 	}
 
 	report := discover.Scan(*home, *work)
+
+	// 可分享的单文件页面：内容要能被转发，所以不依赖任何服务端
+	if *sharePath != "" {
+		page := share.RenderScan(report, share.Meta{Version: version, Generated: time.Now()})
+		if err := os.WriteFile(*sharePath, []byte(page), 0o644); err != nil {
+			fmt.Fprintf(os.Stderr, "写分享页失败：%v\n", err)
+			return 1
+		}
+		fmt.Fprintf(os.Stderr, "分享页已写出：%s（单文件，双击打开；转发前先看一眼里面的路径）\n", *sharePath)
+	}
 
 	var inv model.Inventory
 	failures := map[string]string{}
