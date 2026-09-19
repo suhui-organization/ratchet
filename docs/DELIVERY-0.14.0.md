@@ -213,6 +213,22 @@ https://dev.to/waldenwuwei/i-counted-what-my-ai-agents-can-actually-touch-16-mcp
 绕过的办法只有两条：换网络（手机热点/境外节点）发，或走 Reddit 的 developer token。
 文案已经备好（[content/01](content/01-scan-report.en.md) 的 "Reddit — r/mcp" 段），
 在手机浏览器里贴一次即可，不需要改动。
+
+### Reddit 补充：API 这条路也关了（2026-09-19 实测）
+
+登录之后网络拦截确实消失（`/r/mcp/submit` 从 `blocked by network security` 变成正常表单，
+页头出现账号 `Tight_Programmer1340`），但**发帖框里不渲染"发布"按钮**——
+翻遍整个 DOM（含 shadow root）只有"草稿"和工具栏那几个按钮。Reddit 对自动化浏览器区别对待。
+
+于是改用 Reddit API（`/prefs/apps` 建 script 应用）。表单已填好
+（name `ratchet-mcp-poster` / type `script` / redirect `http://localhost:8080` /
+about `https://podcloud.dlszjr.com`），reCAPTCHA 也过了一次（token 2425 字符），
+但提交后应用没出现在 "developed applications"，并且**验证码那一格被换成了政策提示**：
+
+> In order to create an application or use our API you can read our full policies here
+
+即**该账号不具备创建应用的资格**（账号很新）。结论：这个账号 + 这个网络下，
+浏览器与 API 两条路都不通，只能人工发。
 ## 8. 这一轮之后的判据
 
 按 GTM 的止损线看，接下来两周要盯的是三个数，不是 star：
