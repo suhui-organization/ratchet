@@ -1,0 +1,83 @@
+# 交付记录 0.14.0 —— 开始营销：收款接上、漏斗补上、内容到位
+
+> 日期：2026-09-19。上一版见 [DELIVERY-0.13.0.md](DELIVERY-0.13.0.md)。
+> 对应 [GTM.md](GTM.md) 里的"第一节之后、第二节开始"。
+
+## 1. 这一版做了什么（第二节四件事）
+
+| # | 计划里的事 | 状态 | 落点 |
+|---|---|---|---|
+| 2.1 | Registry 重发到 0.12.0 | 卡片已开：等 GitHub 设备授权后立刻 publish | `server.json`（version 0.12.0 / identifier `v0.12.0`） |
+| 2.2 | 定价页接上真实收款 | 已接（站点已构建，等发布） | `web/app/pages/pricing.vue`、`web/app/utils/paddle.ts`、`web/app/pages/thanks.vue` |
+| 2.3 | 内容资产补到 4 篇 | 已完成 02/03/04 | `docs/content/02-pinning-reality.en.md`、`03-tool-surface.en.md`、`04-answer-the-question.en.md` |
+| 2.4 | 首页补"10 秒出数字"钩子 | 已加（站点已构建，等发布） | `web/app/pages/index.vue` 的 `#after` 段 |
+
+## 2. 收款：Paddle（真实接入，不是占位）
+
+站点是纯静态的，所以走 **Paddle.js overlay**：前端用公开的 client token 加 price id
+直接开收银台，**不需要自己的后端**——也就不需要保存任何订单号、邮箱或支付数据。
+这与产品对外的说法一致：付款这件事整个交给 Paddle。
+
+| 项 | 值 | 说明 |
+|---|---|---|
+| 商品 | `pro_01m2wn5wesc49jqy73ymndx4hx` — Agent permission audit (one engagement) | 新建，status=active |
+| 价格 | `pri_01m2wn60hxk03jmrdd2h0bx489` — USD 1500.00，一次性 | 取 GTM 价格带（$1,500–8,000）的最低位 |
+| client token | `live_297463a10ad89aa3315d67a53d0` | **公开值**，本来就跑在浏览器里；写进 `site.ts` 没有风险 |
+| api key | 不落仓库 | 只用于建商品/价格，留在服务器的 Secret 里 |
+| 域名 | `podcloud.dlszjr.com` | 沿用 Paddle 已认证域名，所以没有重走审核 |
+
+页面与收银台的一致性靠一条规矩守住：`site.ts` 的 `auditPrice` 必须与 Paddle 后台那个
+price 的金额一致。页面上写 1500、收银台收 2000，那是合规问题不是文案问题。
+
+配套改动：
+
+- `deploy/docker/security-headers.inc`：CSP 放行 Paddle——`script-src cdn.paddle.com`、
+  `frame-src *.paddle.com`、`connect-src *.paddle.com`、`form-action *.paddle.com`。
+  **少一条，收银台就静默打不开**，而且只在浏览器控制台报错。
+- `web/app/pages/thanks.vue`：付完之后去哪。写清三件事——什么时候有人联系、交付物是什么、
+  对方怎么用它自己的浏览器验证。买完落回首页是最容易让人后悔的一步。
+
+## 3. 内容：三篇都用本机实测数字
+
+不编数据。这三篇里每个数字都来自 2026-09-19 在本机的真实扫描：
+
+| 数字 | 值 |
+|---|---|
+| MCP server | 16（1 个 harness：Codex） |
+| 未锁版本 | 12（其中 4 个写了 `@latest`，8 个连版本串都没有） |
+| 工具总数 | 164（12 个 server 答话，4 个枚举不出来） |
+| 策略三态 | allow 43 · approve 106 · deny 15（另有 24 条"判不出来"） |
+
+第 03 篇特意保留了两条**误判**（`resolve-library-id` 因描述里的 "format" 被判 deny、
+`sequentialthinking` 因 "clear" 被判 deny）。删掉它们，这篇就从"实测"变成"宣传"。
+
+## 4. 首页漏斗
+
+安装命令之后补了一段 `#after`：`scan` → `policy draft` → `deliver`，结尾两个入口
+（去验证页 / 让人替你跑一遍）。原来落地页在"装完了，然后呢"这里断掉——
+曝光能变成安装，但安装之后没有下一步。
+
+## 5. 测试
+
+```console
+$ make test
+python 34 passed · web 15 passed（新增 tests/paddle.test.ts 7 条）· Go 全包 ok
+```
+
+`web/app/utils/paddle.ts` 被特意做成纯函数：配置判空、environment 归一化、
+successUrl 拼接都能在 node 环境直接测，不需要 Nuxt 运行时，也不会在 prerender 期间碰 window。
+
+## 6. 未完成（有明确卡点）
+
+| # | 事项 | 卡点 | 下一步 |
+|---|---|---|---|
+| 1 | Registry 重发 0.12.0 | 需要 GitHub 设备授权（JWT 寿命很短，授权后必须立刻 publish） | 授权码已生成，点完立即执行 |
+| 2 | 站点发布（含收款与漏斗） | **VPN 隧道重连后 192.168.66.0/24 路由未恢复**：ping 通、TCP 全断，hadoop8 与 web01 都进不去 | 隧道恢复后一条 `deploy/swr/deploy-remote.sh` 即可；镜像 `ratchet-web:0.12.0-54ba377` 已在 SWR |
+
+## 7. 这一轮之后的判据
+
+按 GTM 的止损线看，接下来两周要盯的是三个数，不是 star：
+
+1. 定价页上"Buy the audit"被点了几次（Paddle 后台能看到 checkout 打开数）
+2. 有没有人走完 `scan` 之后接着跑 `policy draft`
+3. 第一个付费单——若 60 天没有，按 GTM 的结论停下来，不继续改产品
