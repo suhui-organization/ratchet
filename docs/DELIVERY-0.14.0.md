@@ -8,9 +8,9 @@
 | # | 计划里的事 | 状态 | 落点 |
 |---|---|---|---|
 | 2.1 | Registry 重发到 0.12.0 | 卡片已开：等 GitHub 设备授权后立刻 publish | `server.json`（version 0.12.0 / identifier `v0.12.0`） |
-| 2.2 | 定价页接上真实收款 | 已接（站点已构建，等发布） | `web/app/pages/pricing.vue`、`web/app/utils/paddle.ts`、`web/app/pages/thanks.vue` |
+| 2.2 | 定价页接上真实收款 | **已上线**（见 §4 验收） | `web/app/pages/pricing.vue`、`web/app/utils/paddle.ts`、`web/app/pages/thanks.vue` |
 | 2.3 | 内容资产补到 4 篇 | 已完成 02/03/04 | `docs/content/02-pinning-reality.en.md`、`03-tool-surface.en.md`、`04-answer-the-question.en.md` |
-| 2.4 | 首页补"10 秒出数字"钩子 | 已加（站点已构建，等发布） | `web/app/pages/index.vue` 的 `#after` 段 |
+| 2.4 | 首页补"10 秒出数字"钩子 | **已上线** | `web/app/pages/index.vue` 的 `#after` 段 |
 
 ## 2. 收款：Paddle（真实接入，不是占位）
 
@@ -67,14 +67,29 @@ python 34 passed · web 15 passed（新增 tests/paddle.test.ts 7 条）· Go �
 `web/app/utils/paddle.ts` 被特意做成纯函数：配置判空、environment 归一化、
 successUrl 拼接都能在 node 环境直接测，不需要 Nuxt 运行时，也不会在 prerender 期间碰 window。
 
-## 6. 未完成（有明确卡点）
+## 6. 上线与验收
+
+镜像 `swr.ap-southeast-3.myhuaweicloud.com/digital-finance/ratchet-web:0.12.0-54ba377`
+已发布到 `ratchet` 命名空间（2/2 Running，`check-drift.sh` 退出码 0），出口域名
+`https://podcloud.dlszjr.com` 上可以看到：
+
+| 验收项 | 结果 |
+|---|---|
+| 首页三步漏斗 | `Ten seconds after install…` + `Verify a delivery` 出现 |
+| 定价页 | `$1,500 USD` + `Buy the audit` + `Paddle` 说明 |
+| 付完之后的页面 | `/thanks` → 200 |
+| CSP 放行收银台 | `script-src https://cdn.paddle.com; frame-src https://*.paddle.com` 已生效 |
+
+途中新增 `deploy/swr/release.sh`：把"同步部署文件 → 服务器 helm upgrade → 漂移检查"
+合成一条命令。这次发布正好证明它有用——VPN 中间断过一次，重连后一条命令补完，
+不用再手敲三次 ssh。
+
+## 7. 未完成
 
 | # | 事项 | 卡点 | 下一步 |
 |---|---|---|---|
-| 1 | Registry 重发 0.12.0 | 需要 GitHub 设备授权（JWT 寿命很短，授权后必须立刻 publish） | 授权码已生成，点完立即执行 |
-| 2 | 站点发布（含收款与漏斗） | **VPN 隧道重连后 192.168.66.0/24 路由未恢复**：ping 通、TCP 全断，hadoop8 与 web01 都进不去 | 隧道恢复后一条 `deploy/swr/deploy-remote.sh` 即可；镜像 `ratchet-web:0.12.0-54ba377` 已在 SWR |
-
-## 7. 这一轮之后的判据
+| 1 | Registry 重发 0.12.0 | 需要 GitHub 设备授权（JWT 寿命很短，授权后必须立刻 publish） | 设备码已生成，点完立刻 publish |
+## 8. 这一轮之后的判据
 
 按 GTM 的止损线看，接下来两周要盯的是三个数，不是 star：
 

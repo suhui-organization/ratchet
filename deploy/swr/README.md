@@ -32,9 +32,12 @@ SWR 不认 Docker 的 attestation manifest。改这里之前先读 §0。
 
 1. 改 `deploy/k8s/helm/ratchet/values-remote.yaml` 里的 `image.web.tag` → 提交；
 2. `./deploy/swr/build-push.sh <tag>`（也可以不传 tag，脚本按 `<版本>-<短 sha>` 自算）；
-3. `./deploy/swr/sync-deploy.sh`；
-4. 服务器上 `IMAGE_TAG=<tag> bash deploy/swr/deploy-remote.sh`；
-5. `bash deploy/swr/check-drift.sh`，退出码 0 = 无漂移。
+3. `./deploy/swr/release.sh <tag>` —— 一条命令跑完后三步：同步部署文件 → 服务器
+   `helm upgrade` → 漂移检查（退出码 0 = 无漂移）。
+
+> 第 3 步以前是三条手敲命令，中间隔着两次 ssh；VPN 抖一下就会出现"发到一半"。
+> 现在串成一个脚本，且每一步都幂等，可以单独重跑。
+> 想拆开单跑也可以，等价命令是：`sync-deploy.sh` → `deploy-remote.sh` → `check-drift.sh`。
 
 > 对 helm 管理下的 Deployment **不要**再用 `kubectl set image` / `kubectl scale`。
 > 紧急情况下不得已用了，事后必须把 values 改到一致并跑一次 helm upgrade 收敛。
