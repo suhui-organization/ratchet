@@ -103,7 +103,7 @@ $ for p in / /verify /pricing /legal/terms /legal/privacy /legal/refund /healthz
 
 | # | 事项 | 影响 |
 |---|---|---|
-| K1 | `ratchet.dlszjr.com` 还没加 DNS 记录 | 想要个干净域名就加一条 A → `59.46.235.173`，然后在 web01 加同名 vhost（`DOMAINS=ratchet.dlszjr.com` 跑一次脚本） |
+| K1 | ~~`ratchet.dlszjr.com` 还没加 DNS~~ → **决定不加** | 域名只保留 `podcloud.dlszjr.com`：它是 Paddle 认证绑定的那个，换域名要重走收单审核，加别名只会多一处要解释的地方 |
 | K2 | 站点版本号仍显示 0.12.0 | 这一版只动了站点与部署，没有走 `make release`；下次发版时统一 |
 | K3 | 集群里没有 Ratchet 自身的 MCP 服务 | CLI/MCP 镜像已推到 SWR（`digital-finance/ratchet`），但按设计 Ratchet 跑在用户机器上，集群里只放站点 |
 | K4 | 没有 CI 自动发版到 SWR | 目前是本地 `build-push.sh`；要自动化得把 SWR 密钥放进 GitHub Secrets |
@@ -114,4 +114,4 @@ $ for p in / /verify /pricing /legal/terms /legal/privacy /legal/refund /healthz
 接下来真正的稀缺资源不是代码：
 
 - 站点的存在意义是让第一个客户能**自己验证**结论——现在的下一个瓶颈是把它发出去；
-- K1/K2 是十分钟的活，等有人真的用 `ratchet.dlszjr.com` 再说不迟。
+- K2 是十分钟的活，下次发版顺手做掉。

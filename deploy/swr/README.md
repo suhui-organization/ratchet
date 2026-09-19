@@ -105,25 +105,32 @@ bash deploy/swr/check-drift.sh
 终结（通配符证书 `*.dlszjr.com`），它按 `server_name` 反代到各服务的 NodePort：
 
 ```
-podcloud.dlszjr.com ─┐
-ratchet.dlszjr.com ──┼─> web01:nginx:443 ──> 192.168.66.8:30090 (ratchet-web)
-                     ┘        （TLS + 通配符证书）
+podcloud.dlszjr.com ──> web01:nginx:443 ──> 192.168.66.8:30090 (ratchet-web)
+                          （TLS: *.dlszjr.com 通配符证书）
 finharness.dlszjr.com ──> 192.168.66.8:30080
+market.dlszjr.com     ──> 192.168.66.8:30085
 ```
+
+**只用一个域名：`podcloud.dlszjr.com`。** 这个域名是 Paddle 认证绑定的那个，
+换域名等于重走一遍收单审核；再挂一个别名（比如 `ratchet.dlszjr.com`）只会让
+"客户在哪个域名上付的钱、发票上写的是谁"多一个需要解释的地方，收益为零。
+所以集群 NodePort、web01 vhost、站点里的 Paddle 配置都对准这一个域名。
 
 改映射（本机执行，带自动回滚）：
 
 ```bash
 EDGE_PASSWORD='<web01 root 密码>' ./deploy/swr/set-edge-domain.sh
 
-# 换域名 / 试跑：
-DRY_RUN=1 DOMAINS="ratchet.dlszjr.com podcloud.dlszjr.com" ./deploy/swr/set-edge-domain.sh
-DOMAINS="ratchet.dlszjr.com" EDGE_PASSWORD='...' ./deploy/swr/set-edge-domain.sh
+# 只想看会写什么（不碰服务器）：
+DRY_RUN=1 ./deploy/swr/set-edge-domain.sh
+
+# 万不得已要换域名（会同时改 DNS 与 Paddle 认证，别轻易做）：
+DOMAINS="new.dlszjr.com" EDGE_PASSWORD='...' ./deploy/swr/set-edge-domain.sh
 ```
 
 脚本会先 `cp` 备份原 vhost 到 `<文件>.bak-<时间戳>`，写入后 `nginx -t`，
-**不通过就整批回滚**，通过了才 reload。新增子域名只需要 DNS 把 A 记录指到
-`59.46.235.173`（web01 的公网出口），证书是通配符，不用另外签。
+**不通过就整批回滚**，通过了才 reload。证书是通配符，换域名不用重新签，
+但 DNS 的 A 记录要指到 `59.46.235.173`（web01 的公网出口）。
 
 > 域名目前的状态：`podcloud.dlszjr.com` 原来指向旧 Pod Cloud（NodePort 30088），
 > 现已改指 Ratchet；旧 Pod Cloud 的 Deployment 还在集群里，回滚就是把 vhost 的
