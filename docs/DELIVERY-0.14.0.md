@@ -294,6 +294,32 @@ about `https://podcloud.dlszjr.com`），reCAPTCHA 也过了一次（token 2425 
 
 > 发布踩坑：X 的 composer 有 280 字符硬限制，超了按钮直接 `enabled: false`（不会报错，
 > 只会点不动）。脚本里必须先判断 `isEnabled()` 再点。
+
+## 15. 渠道扩展（第一梯队）
+
+### 已提交
+
+| 渠道 | 状态 | 证据 |
+|---|---|---|
+| **Docker 官方 MCP Catalog** | PR 已提交，等 Docker 团队 review | [docker/mcp-registry#5164](https://github.com/docker/mcp-registry/pull/5164)，加的是 `servers/ratchet/server.yaml`（category: security，source 钉到本仓库 commit） |
+| Glama | 已提交待审 | 见 §10 |
+| punkpeye/awesome-mcp-servers | PR open | #14700 |
+| awesome-ai-security-tools | PR open（观察名单） | #117 |
+| 官方 MCP Registry | 已发布 0.12.0 | `io.github.iversonwuwei/ratchet` |
+
+### 走不通的（有依据，不再重复试）
+
+| 渠道 | 原因 |
+|---|---|
+| **wong2/awesome-mcp-servers**（4.3k star） | 仓库**同时禁用了 PR 与 issue**（`has_issues: false`，PR 页明示 "An owner of this repository has disabled the ability to open pull requests"）——零提交入口。条目已按字母序写好放在 fork 分支 `add-ratchet`，哪天他们开放了可以一键提 |
+| **PulseMCP** | `/submit` 用 curl 能取到 200，但内置浏览器导航超时（bot 防护）。另：它主要抓官方 Registry，我们已经在那上面，大概率会自然收录 |
+| **mcp.so** | `/submit` 返回 307（跳登录），需要账号态 |
+| TikTok | 见 §13 |
+
+### GitHub 侧顺手修的两处
+
+- 仓库 **homepage 原来指向旧的 Vercel 地址**，已改成生产域名 `https://podcloud.dlszjr.com`（这个链接出现在每个访客的侧栏）；
+- **topics 原本为空**，已设 11 个：`mcp` `mcp-server` `agent-security` `ai-security` `least-privilege` `permissions` `supply-chain-security` `golang` `cli` `ai-agents` `model-context-protocol`。
 ## 8. 这一轮之后的判据
 
 按 GTM 的止损线看，接下来两周要盯的是三个数，不是 star：
