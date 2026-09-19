@@ -1,8 +1,8 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
-  "name": "io.github.suhui-organization/ratchet",
+  "name": "io.github.iversonwuwei/ratchet",
   "description": "Read-only tools to inspect your agent setup: list MCP servers, flag unpinned ones, test a policy.",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "websiteUrl": "https://github.com/suhui-organization/ratchet",
   "repository": {
     "url": "https://github.com/suhui-organization/ratchet",
@@ -11,8 +11,7 @@
   "packages": [
     {
       "registryType": "oci",
-      "identifier": "ghcr.io/suhui-organization/ratchet",
-      "version": "0.10.0",
+      "identifier": "ghcr.io/suhui-organization/ratchet:v0.10.1",
       "transport": {
         "type": "stdio"
       }

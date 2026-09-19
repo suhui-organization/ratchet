@@ -18,6 +18,15 @@ FROM alpine:3.20
 # 不以 root 运行：容器里跑的是一个会读配置文件的工具，没有理由给它 root
 RUN adduser -D -u 10001 ratchet
 COPY --from=build /out/ratchet /usr/local/bin/ratchet
+
+# MCP Registry 要求的标注：没有它，publish 会被拒
+# （错误原文：OCI image is missing required annotation. Add this to your Dockerfile:
+#   LABEL io.modelcontextprotocol.server.name="…"）
+LABEL io.modelcontextprotocol.server.name="io.github.iversonwuwei/ratchet"
+LABEL org.opencontainers.image.source="https://github.com/suhui-organization/ratchet"
+LABEL org.opencontainers.image.description="Read-only tools to inspect your agent setup: list MCP servers, flag unpinned ones, test a policy."
+LABEL org.opencontainers.image.licenses="Apache-2.0"
+
 USER ratchet
 WORKDIR /home/ratchet
 ENV HOME=/home/ratchet
