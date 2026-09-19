@@ -21,10 +21,11 @@ RUN npm run generate
 
 FROM nginx:1.27-alpine
 
-# nginx 的 include 走的是相对 conf.d 的路径，所以两个文件必须放在同一层；
+# 必须覆盖镜像自带的 default.conf（名字也得叫这个，否则按字母序排在它后面就不生效）；
 # 头部片段用 .inc 而不是 .conf：conf.d/*.conf 会被主配置自动加载一遍，
 # 那相当于提前把 add_header 挂到 http 层，行为会变得不好预测。
-COPY deploy/docker/nginx.conf deploy/docker/security-headers.inc /etc/nginx/conf.d/
+COPY deploy/docker/default.conf /etc/nginx/conf.d/default.conf
+COPY deploy/docker/security-headers.inc /etc/nginx/conf.d/security-headers.inc
 COPY --from=build /app/.output/public /usr/share/nginx/html
 
 EXPOSE 80

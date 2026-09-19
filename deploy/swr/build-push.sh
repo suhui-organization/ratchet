@@ -8,6 +8,10 @@
 # 默认值就是线上那套（registry / 组织名），不 export 也能跑。这两个值以前在
 # FinHarness 上被抄反过一次（registry 写 cn-east-3、组织写产品名），照抄注释就把镜像
 # 推到了一个集群拉不到的地址，所以这里的默认值按"线上真实值"钉住。
+#
+# 注意 tag 的默认值是 `<版本>-<当前 HEAD 短 sha>`：如果你刚改完 values 里的 tag
+# 又提交了那次改动，默认值算出来的是**新**commit，和 values 里写的对不上。
+# 正式发版请显式传 tag（`build-push.sh 0.12.0-fa700c3`），让两边是同一个字符串。
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"

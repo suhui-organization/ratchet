@@ -4,7 +4,7 @@
 # 前置反向代理在 web01（192.168.66.10），TLS 用通配符证书 *.dlszjr.com，
 # 按 server_name 分流到集群里各服务的 NodePort。这里只做一件事：把域名转到
 # Ratchet 站点的 NodePort。没有 rewrite、没有子路径——站点的缓存与安全头
-# 写在镜像内的 nginx 配置里（deploy/docker/nginx.conf），一处生效。
+# 写在镜像内的 nginx 配置里（deploy/docker/default.conf），一处生效。
 
 server {
     listen 80;
