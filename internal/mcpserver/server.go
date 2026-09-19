@@ -22,6 +22,14 @@ import (
 
 const protocolVersion = "2024-11-05"
 
+// ServerVersion 是 initialize 响应里报出去的版本号。
+//
+// 为什么要做成可注入的：这里原先硬编码 "0.9.0"，而二进制已经是 0.12.0——
+// 一个讲"可验证"的工具对外报了一个和实际不符的版本号，这比缺功能更伤信任
+// （客户端、目录、报告都会引用它）。现在由 main 注入 cmd/ratchet 里那份唯一的版本，
+// 两处再也不可能各说各话。
+var ServerVersion = "dev"
+
 type request struct {
 	JSONRPC string          `json:"jsonrpc"`
 	ID      json.RawMessage `json:"id,omitempty"`
@@ -115,7 +123,7 @@ func dispatch(method string, params json.RawMessage) (any, error) {
 		return map[string]any{
 			"protocolVersion": protocolVersion,
 			"capabilities":    map[string]any{"tools": map[string]any{}},
-			"serverInfo":      map[string]any{"name": "ratchet", "version": "0.9.0"},
+			"serverInfo":      map[string]any{"name": "ratchet", "version": ServerVersion},
 		}, nil
 	case "tools/list":
 		return map[string]any{"tools": tools()}, nil

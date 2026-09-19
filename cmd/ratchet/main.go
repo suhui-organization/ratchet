@@ -52,6 +52,8 @@ func main() {
 		os.Exit(cmdIngest(os.Args[2:]))
 	case "mcp":
 		// 以 stdio MCP server 运行（供 MCP 客户端与官方 Registry 收录）
+		mcpserver.ServerVersion = version // 版本号只认 main 里这一份，别在包里另写
+		mcp.ClientVersion = version
 		if err := mcpserver.Serve(os.Stdin, os.Stdout, os.Stderr); err != nil {
 			fmt.Fprintf(os.Stderr, "ratchet mcp: %v\n", err)
 			os.Exit(1)

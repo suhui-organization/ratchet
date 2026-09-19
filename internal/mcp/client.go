@@ -19,6 +19,11 @@ import (
 	"time"
 )
 
+// ClientVersion 是握手时告诉对端 server 的自身版本。
+// 与 mcpserver.ServerVersion 同理：写死的版本号会漂移（这里曾写死 0.1.0），
+// 由 main 注入唯一的那一份版本。
+var ClientVersion = "dev"
+
 // Tool 是 server 暴露的一个工具。
 type Tool struct {
 	Name        string `json:"name"`

@@ -10,6 +10,26 @@ import (
 )
 
 // roundTrip 把几条请求喂进去，取回响应。stdout 里除了 JSON-RPC 不该有别的东西。
+
+// TestInitializeReportsInjectedVersion 盯的是一次真实事故：initialize 里的
+// serverInfo.version 曾经硬编码成 "0.9.0"，而二进制已经是 0.12.0——
+// 对外报的版本和实际不符，客户端与目录都会引用它。
+// 现在版本由 main 注入，这个测试保证"注入什么就报什么"，且不再有写死的字面量。
+func TestInitializeReportsInjectedVersion(t *testing.T) {
+	old := ServerVersion
+	defer func() { ServerVersion = old }()
+	ServerVersion = "9.9.9-test"
+
+	out := roundTrip(t, `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}`)
+	if len(out) != 1 {
+		t.Fatalf("期望 1 条响应，得到 %d", len(out))
+	}
+	result, _ := out[0]["result"].(map[string]any)
+	info, _ := result["serverInfo"].(map[string]any)
+	if got := info["version"]; got != "9.9.9-test" {
+		t.Fatalf("serverInfo.version = %v，期望注入进去的 9.9.9-test", got)
+	}
+}
 func roundTrip(t *testing.T, reqs ...string) []map[string]any {
 	t.Helper()
 	var stdout, stderr bytes.Buffer
