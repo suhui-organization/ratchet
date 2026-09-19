@@ -6,6 +6,12 @@
 curl -fsSL https://github.com/suhui-organization/ratchet/releases/latest/download/install.sh | sh
 ```
 
+macOS / Linux 上也可以用 Homebrew（formula 钉住每个平台的 sha256）：
+
+```bash
+brew install suhui-organization/tap/ratchet
+```
+
 Linux / macOS（amd64 · arm64）。装完先跑这一条——**只读配置，不执行任何东西**：
 
 ```bash
