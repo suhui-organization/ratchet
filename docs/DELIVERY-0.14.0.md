@@ -268,6 +268,32 @@ about `https://podcloud.dlszjr.com`），reCAPTCHA 也过了一次（token 2425 
 
 真要做，唯一现实路径是**人工**：录一段 30 秒屏幕录制（跑 `ratchet scan --home ~` → `--introspect`
 亮出 164 个工具），自己手动发。分镜脚本可以写，但优先级排在 X / HN / dev.to 之后。
+
+## 14. HN：两道门都是账号资历（2026-09-19）
+
+内置浏览器里 HN **已登录**（`/submit` 直接给表单），北京时间晚 8:30 正好是美东上午窗口，
+于是按内容包发 Show HN。结果两道门都没过：
+
+1. 带 `Show HN:` 前缀 → 被重定向到 `/showlim`，原文：
+   *"We're temporarily restricting Show HNs because of a massive influx, mostly by users who
+   aren't yet familiar with the site or its culture."*
+2. 去掉前缀、改成普通链接提交 → 重定向到 `/x?...&fnop=toonew`，即**账号太新，还不能提交**。
+
+结论：HN 与 Reddit 同一类问题——**平台按账号资历设限**，跟内容质量无关，
+也不是自动化能绕的（绕过正是它们要防的）。可行的只有两条：
+
+- 让账号先参与一段时间（读、评论、投票攒 karma），之后偶尔发一次；
+- 或者用你已有的老 HN 账号（如果有）。
+
+第三轮点对点回复（X，2 条，累计 6 条）：
+
+| 对象 | 他们的帖 | 我回的内容要点 |
+|---|---|---|
+| @JaredMabry | "能改自己审计日志的 agent，是替自己作证的证人" | 让收货方做算术：交付带 sha256 清单、由对方浏览器重算，agent 无权描述自己的行为；164 个可达工具 / 15 个绝不会手工批准 |
+| @finn_YF | 代理指标掩盖 agent 的真实失败 | 名字/描述的启发式也是代理指标：我这边 `resolve-library-id` 因命中 "format"、`sequentialthinking` 因 "clear" 被误判——所以每条判定都打印它命中的短语，24 条标成"无法判断"而不是猜 |
+
+> 发布踩坑：X 的 composer 有 280 字符硬限制，超了按钮直接 `enabled: false`（不会报错，
+> 只会点不动）。脚本里必须先判断 `isEnabled()` 再点。
 ## 8. 这一轮之后的判据
 
 按 GTM 的止损线看，接下来两周要盯的是三个数，不是 star：
