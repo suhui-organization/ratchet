@@ -229,6 +229,45 @@ about `https://podcloud.dlszjr.com`），reCAPTCHA 也过了一次（token 2425 
 
 即**该账号不具备创建应用的资格**（账号很新）。结论：这个账号 + 这个网络下，
 浏览器与 API 两条路都不通，只能人工发。
+
+## 12. 点对点回复（engagement）第一、二轮
+
+思路来自 GTM 第 1 节：**只回"自己公开说出这个痛点"的人**，回事实、不带链接、不提产品，
+结尾把话题交回给对方。工具是 X 实时搜索 + 浏览器自动化（现在唯一稳定可用的渠道）。
+
+已发出 4 条：
+
+| 时间 | 对象 | 他们的帖 | 我回的内容要点 |
+|---|---|---|---|
+| 19:57 | @nineshoot | Plugin4Shell：已信任的插件零点击替换自己 | 同一个失效模式；我的 16 个 server / 12 个未锁；锁版本只是便宜的那一半 |
+| 20:24 | @raqi_ai_uae | 第三方 agent skill 是新的企业风险层 | 可度量的那部分：16 / 12 / 4 个根本枚举不出来；"未知"不等于"安全" |
+| 20:24 | @coolsoftware_ws | 我们以前担心软件供应链，现在是 agent | AI 版同上：和浮动 npm tag 同一个威胁模型，区别是它成了 agent 能调用的工具 |
+| 20:25 | @xuxin_AI | AI Agent Skills 可能成为新安全风险 | 164 个可达工具、其中 15 个我绝不会手工批准；清单存在，只是没人写下来 |
+
+**跳过的人**（同样是纪律的一部分）：
+
+- 卖 MCP 安全产品的 vendor（@delimit_ai 等）——去人家店里讲"我们更便宜"是负分；
+- 产品/新闻播报帖（Google Home MCP、Codex AgentControl、GitLab 19.4、Black Hat 会场推广）——没有痛点，回复即噪音。
+
+**发布方式的可复用部分**（写下来免得下次再摸）：
+
+1. X 实时搜索：`("MCP" OR "agent") ("supply chain" OR unpinned OR "least privilege") lang:en -filter:replies`，加 `f=live`；
+2. **取帖子链接不要用 AX 快照**（它只回增量 diff，第二次就 "no change"），直接用
+   Playwright：`locator("article").evaluateAll(...)` 读 `a[href*="/status/"]`；
+3. 回复框 `div[data-testid="tweetTextarea_0"]` + `.fill()` + `button[data-testid="tweetButtonInline"]`
+   ——比 AX 元素号稳得多（AX 的 setValue 会把多行文本截断成最后一段）；
+4. 一次只发一条，别把三条塞进同一个 30 秒的脚本（会超时，前两条发出、第三条丢失）。
+
+## 13. TikTok：评估结论是"不做"
+
+| 维度 | 判断 |
+|---|---|
+| 人群 | 不匹配。买这个的是开发者/外包顾问/要过合规的团队，他们找工具在 X / HN / Reddit / dev.to，不在 TikTok |
+| 通道 | 没有可用自动通道：Content Posting API 只对审核通过的开发者应用开放；浏览器自动化被检测得比 Reddit 更严 |
+| 形式 | 我们最强的资产是文字数字（16 / 12 / 164 / 15）；TikTok 要 30–60 秒短视频，是另一条产线 |
+
+真要做，唯一现实路径是**人工**：录一段 30 秒屏幕录制（跑 `ratchet scan --home ~` → `--introspect`
+亮出 164 个工具），自己手动发。分镜脚本可以写，但优先级排在 X / HN / dev.to 之后。
 ## 8. 这一轮之后的判据
 
 按 GTM 的止损线看，接下来两周要盯的是三个数，不是 star：
