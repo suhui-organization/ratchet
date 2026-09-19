@@ -163,12 +163,30 @@ introspection 检查，再把 Glama 分数徽章加到条目里。现状：
 
 数字与 `ratchet scan` 在 2026-09-19 的实测一致（16 / 12 / 4+8 / 164 工具）。
 
-### Glama 的现状（下一步）
+### Glama：已提交（2026-09-19）
 
-`glama.ai/mcp/servers` 能打开，"Add Server" 弹窗也能出来，但**用 GitHub 登录那一步在
-内置浏览器里走不完**（点击后页面崩溃过一次，重试后停在原地没有跳转 OAuth）。
-所以这一条要么手动点一次，要么换到用户自己的 Chrome 里做——`glama.json` 已经进仓库，
-他们的爬虫也会自己发现仓库，所以这不是必须今天解决的阻塞项。
+登录后 "Add Server" 直接给的就是提交表单（不是在注册墙后面），已按表单要求提交：
+
+| 字段 | 值 |
+|---|---|
+| Name | `Ratchet` |
+| Description | 一句话说明：只读 CLI + stdio MCP server，列 server/工具 → 编译三态策略（每条带依据）→ 出可自验的交付物 |
+| GitHub Repository URL | `https://github.com/suhui-organization/ratchet` |
+
+结果：页面弹出 **"Your server has been submitted for review"**。
+表单里写明：审核通过后会**发邮件要求提供 Dockerfile** 做自动化安全与质量检查，
+只有通过检查的 server 才会被索引。我们的 `Dockerfile` 默认 `CMD ["mcp"]`，
+起来就是一个 stdio MCP server，符合"能启动并响应 introspection"这条要求。
+
+**踩坑记录**（下一次省时间）：
+
+1. 第一次点 GitHub 登录让内置浏览器**整页崩了**（`This page crashed`）；
+2. 登录态就绪后弹窗是提交表单，但内置浏览器的 AX 快照只回**增量 diff**，
+   第二次取快照会返回 "no change"，拿到的是过期元素号——所以每取一次快照就要用完再取下一次；
+3. 最后是靠 `tab.playwright.locator('button:has-text("Submit for Review")')` 点掉的：
+   **有 DOM 接口就别猜元素号**。
+
+审核通过、拿到徽章地址后，把徽章补进 awesome-mcp-servers 的 PR（机器人会重新检查）。
 ## 8. 这一轮之后的判据
 
 按 GTM 的止损线看，接下来两周要盯的是三个数，不是 star：
