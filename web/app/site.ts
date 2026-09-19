@@ -28,6 +28,15 @@ export const site = {
   installUrl: 'https://github.com/suhui-organization/ratchet/releases/latest/download',
   /** 无下载地址时的联系入口。 */
   contactUrl: 'mailto:ratchet@example.com?subject=Ratchet%20access',
+  /** 页面上显示的联系邮箱（必须与 contactUrl 指向同一个信箱）。 */
+  contactEmail: 'ratchet@example.com',
+  /**
+   * 一次性审计的起价。**定价是业务决定**，所以留成配置：
+   * 没定之前页面会显式说明"按次报价、不在此公布"，而不是编一个数字。
+   */
+  auditPrice: 'discussed per engagement',
+  /** 定价一旦确定，把它设成 true，页面上那句"给审核方看的说明"就会消失。 */
+  auditPriceIsPublished: false,
   /** 源码获取方式（仓库暂不公开，写清楚而不是留假链接）。 */
   sourceNote: 'Source is not public yet. The build is reproducible from the commands below.',
 } as const

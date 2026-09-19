@@ -217,7 +217,13 @@ const limits = [
         <span>·</span>
         <span>© 2026</span>
         <span class="text-faint">developer preview — output formats will change</span>
-        <NuxtLink to="/verify" class="ml-auto hover:text-brand">Verify a delivery</NuxtLink>
+        <div class="ml-auto flex flex-wrap gap-x-5 gap-y-2">
+          <NuxtLink to="/pricing" class="hover:text-brand">Pricing</NuxtLink>
+          <NuxtLink to="/legal/terms" class="hover:text-brand">Terms</NuxtLink>
+          <NuxtLink to="/legal/privacy" class="hover:text-brand">Privacy</NuxtLink>
+          <NuxtLink to="/legal/refund" class="hover:text-brand">Refunds</NuxtLink>
+          <a :href="site.contactUrl" class="hover:text-brand">Contact</a>
+        </div>
       </div>
     </footer>
   </div>
