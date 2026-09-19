@@ -19,3 +19,5 @@ dist/
 # 交付物（本地生成，不进仓库）
 /delivery/
 /dist/
+# MCPB 打包产物（本地生成）
+/dist/
