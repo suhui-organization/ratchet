@@ -320,6 +320,20 @@ about `https://podcloud.dlszjr.com`），reCAPTCHA 也过了一次（token 2425 
 
 - 仓库 **homepage 原来指向旧的 Vercel 地址**，已改成生产域名 `https://podcloud.dlszjr.com`（这个链接出现在每个访客的侧栏）；
 - **topics 原本为空**，已设 11 个：`mcp` `mcp-server` `agent-security` `ai-security` `least-privilege` `permissions` `supply-chain-security` `golang` `cli` `ai-agents` `model-context-protocol`。
+
+## 16. LinkedIn：已发布（2026-09-20）
+
+账号是「吴嵬 / 大连素辉软件科技有限公司 - 高级技术经理」，**网络是中文的**，所以发的是内容包 04 的
+**中文版**（英文版对这批读者不合适）：
+
+> 做 AI 落地到最后总会撞上同一个问题，而且提问题的人通常不是工程师：**"你这个 agent 到底能碰什么？"**
+> ……（五步方法论）…… 本机实测：16 个 MCP server、12 个未锁版本、164 个可达工具，其中 15 个我绝不会手工批准。
+
+不带链接、不提产品名。发布手法：Playwright 打开 `发动态` → `li.ax.paste()` 贴入 681 字 →
+点 `发布`（内容为空时该按钮是 disabled，贴完自动激活）。
+
+**LinkedIn 是给"一次性权限审计"这门生意用的**，不是给 CLI 拉 star 的：目标是那些要替客户回答
+"agent 能碰什么"的人。后续内容方向继续走合规与交付，不要走命令行技巧。
 ## 8. 这一轮之后的判据
 
 按 GTM 的止损线看，接下来两周要盯的是三个数，不是 star：
