@@ -24,6 +24,11 @@ type ToolObservation struct {
 	Tool        string `json:"tool"`
 	Description string `json:"description,omitempty"`
 	Calls       int    `json:"calls,omitempty"`
+	// ArgKeys 是这个工具被调用时出现过的**参数名**（如 path、command）。
+	//
+	// 只记键名，不记值：键名不是秘密，值通常是文件内容、命令行或令牌。
+	// 有了键名才知道"这个工具要传路径"，才谈得上参数级约束。
+	ArgKeys []string `json:"argKeys,omitempty"`
 }
 
 // Inventory 是策略编译的输入。
@@ -41,6 +46,24 @@ type ServerRules struct {
 	Allow   []string `json:"allow"`
 	Approve []string `json:"approve"`
 	Deny    []string `json:"deny"`
+	// Constraints 是参数级约束：工具名 → 约束。缺省表示这个工具只按三态判定。
+	Constraints map[string]ToolConstraints `json:"constraints,omitempty"`
+}
+
+// ToolConstraints 约束一次调用的**参数**。
+//
+// 语义（fail-closed）：
+//   - Paths.Deny 命中任一参数值 → 拒绝
+//   - Paths.Allow 非空时，每个被识别为路径的值都必须命中其中之一，否则拒绝
+//   - 识别不出路径的值不参与 allow 判定（无法判断就不假装判断得出来）
+type ToolConstraints struct {
+	Paths *PathRules `json:"paths,omitempty"`
+}
+
+// PathRules 是路径白/黑名单，用 glob（`*` 不跨目录、`**` 跨目录）。
+type PathRules struct {
+	Allow []string `json:"allow,omitempty"`
+	Deny  []string `json:"deny,omitempty"`
 }
 
 // Policy 是编译产物。

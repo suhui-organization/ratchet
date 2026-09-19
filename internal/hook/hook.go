@@ -111,3 +111,31 @@ func splitMCPTool(tool string) (server, name string, ok bool) {
 	}
 	return rest[:idx], rest[idx+2:], true
 }
+
+// argKeysOf 取工具输入的**键名**，值一律不读。
+//
+// 这是参数级约束的前提：知道"这个工具要传 path"，才谈得上限制它能传哪些路径。
+// 而值（文件内容、命令行、令牌）一个字节都不留。
+func argKeysOf(raw json.RawMessage) []string {
+	if len(raw) == 0 {
+		return nil
+	}
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &obj); err != nil {
+		return nil
+	}
+	keys := make([]string, 0, len(obj))
+	for k := range obj {
+		keys = append(keys, k)
+	}
+	sortStrings(keys)
+	return keys
+}
+
+func sortStrings(s []string) {
+	for i := 1; i < len(s); i++ {
+		for j := i; j > 0 && s[j] < s[j-1]; j-- {
+			s[j], s[j-1] = s[j-1], s[j]
+		}
+	}
+}

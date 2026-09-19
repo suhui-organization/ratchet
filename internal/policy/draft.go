@@ -76,6 +76,11 @@ func Draft(inv model.Inventory, opts Options) model.Policy {
 	}
 	sort.Strings(keys)
 
+	loc := opts.Locale
+	if loc == "" {
+		loc = LocaleEN
+	}
+
 	entries := make([]entry, 0, len(keys))
 	for _, key := range keys {
 		t := merged[key]
@@ -85,10 +90,6 @@ func Draft(inv model.Inventory, opts Options) model.Policy {
 		}
 		cap, match := classifyMatch(t)
 		dec, review := Decide(cap, opts.StrictUnknown)
-		loc := opts.Locale
-		if loc == "" {
-			loc = LocaleEN
-		}
 		reason := match.describe(loc)
 		// 观测到的调用次数是有用的上下文：写进依据里，报告和界面都要显示
 		if t.Calls > 0 {
@@ -132,6 +133,32 @@ func Draft(inv model.Inventory, opts Options) model.Policy {
 		if e.review {
 			needsReview = append(needsReview, model.Key(e.server, e.tool))
 		}
+	}
+	// 参数级约束：给"带路径参数"的工具默认挂上敏感路径黑名单。
+	//
+	// 只挂黑名单、不挂白名单——白名单是业务判断（这个工具只该访问哪些目录），
+	// 工具猜不出来；黑名单是普适的（读 .env 和私钥不该被自动放行）。
+	// 白名单由使用者自己写，`policy check` 可以拿真实调用试。
+	for _, t := range merged {
+		hasPathArg := false
+		for _, k := range t.ArgKeys {
+			if LooksLikePathArg(k) {
+				hasPathArg = true
+				break
+			}
+		}
+		if !hasPathArg {
+			continue
+		}
+		rules := servers[t.Server]
+		if rules.Constraints == nil {
+			rules.Constraints = map[string]model.ToolConstraints{}
+		}
+		rules.Constraints[t.Tool] = model.ToolConstraints{
+			Paths: &model.PathRules{Deny: append([]string(nil), SensitivePathDeny...)},
+		}
+		servers[t.Server] = rules
+		rationale[model.Key(t.Server, t.Tool)] += pathConstraintNote(loc)
 	}
 	sort.Strings(needsReview)
 
@@ -180,4 +207,14 @@ func itoa(n int) string {
 		n /= 10
 	}
 	return string(buf[i:])
+}
+
+// pathConstraintNote 在依据里说明"这个工具额外挂了路径黑名单"。
+//
+// 依据里写清楚，用户才知道为什么不光要看三态、还要看参数级规则。
+func pathConstraintNote(loc Locale) string {
+	if loc == LocaleZH {
+		return "；已加路径黑名单（.env / .ssh / 凭据等，见 constraints.paths.deny）"
+	}
+	return "; path deny-list applied (.env, .ssh, credentials — see constraints.paths.deny)"
 }

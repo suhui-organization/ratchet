@@ -28,6 +28,9 @@ type Call struct {
 	Tool     string `json:"tool"`
 	Decision string `json:"decision,omitempty"`
 	Outcome  string `json:"outcome,omitempty"`
+	// ArgKeys 是这次调用的**参数名**（不是值）。
+	// 值通常是文件内容或令牌，绝不记录；键名用来推断"这个工具要传路径"。
+	ArgKeys []string `json:"argKeys,omitempty"`
 }
 
 // Summary 是观测结果。
@@ -38,6 +41,8 @@ type Summary struct {
 	Total int `json:"total"`
 	// Skipped 是无法解析的行数。坏行要报出来，不能静默当成"没调用"。
 	Skipped int `json:"skipped"`
+	// ArgKeys 是每个工具出现过的参数名集合（键为 "server/tool"）。
+	ArgKeys map[string]map[string]bool `json:"argKeys,omitempty"`
 }
 
 // ReadCalls 读一份 JSONL 调用记录。
@@ -45,7 +50,7 @@ type Summary struct {
 // 空行忽略；坏行计入 Skipped 而不是中断——真实的日志里总有半行。
 // 但坏行数会被报出来：静默吞掉等于伪造"没有调用"。
 func ReadCalls(r io.Reader) (Summary, error) {
-	summary := Summary{Counts: map[string]int{}}
+	summary := Summary{Counts: map[string]int{}, ArgKeys: map[string]map[string]bool{}}
 	scanner := bufio.NewScanner(r)
 	scanner.Buffer(make([]byte, 0, 64*1024), 8*1024*1024)
 	for scanner.Scan() {
@@ -63,7 +68,16 @@ func ReadCalls(r io.Reader) (Summary, error) {
 			continue
 		}
 		summary.Total++
-		summary.Counts[model.Key(call.Server, call.Tool)]++
+		key := model.Key(call.Server, call.Tool)
+		summary.Counts[key]++
+		if len(call.ArgKeys) > 0 {
+			if summary.ArgKeys[key] == nil {
+				summary.ArgKeys[key] = map[string]bool{}
+			}
+			for _, k := range call.ArgKeys {
+				summary.ArgKeys[key][k] = true
+			}
+		}
 	}
 	if err := scanner.Err(); err != nil {
 		return summary, err
@@ -122,7 +136,17 @@ func Compare(inv model.Inventory, summary Summary) Comparison {
 func Apply(inv model.Inventory, summary Summary) model.Inventory {
 	out := model.Inventory{Format: inv.Format, Agent: inv.Agent, Tools: make([]model.ToolObservation, 0, len(inv.Tools))}
 	for _, t := range inv.Tools {
-		t.Calls = summary.Counts[model.Key(t.Server, t.Tool)]
+		key := model.Key(t.Server, t.Tool)
+		t.Calls = summary.Counts[key]
+		// 参数名取并集：不同调用可能只带了其中一部分参数
+		if seen := summary.ArgKeys[key]; len(seen) > 0 {
+			keys := make([]string, 0, len(seen))
+			for k := range seen {
+				keys = append(keys, k)
+			}
+			sort.Strings(keys)
+			t.ArgKeys = keys
+		}
 		out.Tools = append(out.Tools, t)
 	}
 	return out

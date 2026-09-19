@@ -48,6 +48,7 @@ func FromCodex(raw []byte, server, agent string) (observe.Call, bool) {
 	}
 
 	call := observe.Call{Agent: orDefault(agent, "codex")}
+	call.ArgKeys = argKeysOf(p.ToolInput)
 	if s, name, ok := splitMCPTool(tool); ok {
 		// MCP 工具：名字里带着真实来源，直接拆开记。
 		// （早先这里是把 mcp__ 全跳过的——那是假定网关会记一份；

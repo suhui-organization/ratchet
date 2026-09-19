@@ -43,6 +43,7 @@ func FromClaude(raw []byte, server, agent string) (observe.Call, bool) {
 	}
 
 	call := observe.Call{Agent: orDefault(agent, "claude-code")}
+	call.ArgKeys = argKeysOf(p.ToolInput)
 	if s, name, ok := splitMCPTool(tool); ok {
 		// MCP 工具：名字里就带着真实来源
 		call.Server, call.Tool = s, name
