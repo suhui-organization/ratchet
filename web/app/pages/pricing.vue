@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { site } from '~/site'
+
+// 收银台：Paddle overlay。配置缺失时按钮自动退回"写邮件询价"，不会出现点了没反应的按钮。
+const { configured, busy, error, buy } = usePaddleCheckout()
 </script>
 
 <template>
@@ -43,21 +46,33 @@ import { site } from '~/site'
 
         <section class="rounded-xl border border-brand/40 bg-surface-2 p-6">
           <h2 class="text-[17px] font-semibold text-ink">Permission audit</h2>
-          <p class="mt-3 text-[2rem] font-semibold tracking-tight text-ink">From {{ site.auditPrice }}</p>
+          <p class="mt-3 text-[2rem] font-semibold tracking-tight text-ink">{{ site.auditPrice }}</p>
+          <p class="mt-1 text-[13px] text-faint">one engagement · one flat fee</p>
           <p class="mt-3 text-[14px] leading-relaxed text-muted">
-            A one-time engagement for people who have to answer "what can your agent actually
-            touch, and can you prove it". Scoped per engagement; the price depends on how many
-            machines and agents are in range.
+            For people who have to answer "what can your agent actually touch, and can you prove
+            it". We agree the scope at the kickoff call; if your setup is far outside what the flat
+            fee covers, you hear that before anything is charged.
           </p>
           <ul class="mt-5 space-y-2 text-[14px] text-muted">
             <li>· We run it with you and review what it found</li>
             <li>· A least-privilege policy with the reason behind each verdict</li>
             <li>· A delivery your client verifies on their own machine</li>
+            <li>· Kickoff within 1 business day, delivery within 5</li>
           </ul>
-          <a :href="site.contactUrl"
+          <button v-if="configured" type="button" :disabled="busy"
+                  class="mt-6 inline-block rounded-lg bg-brand px-4 py-2 text-[14px] font-medium text-white hover:bg-brand-ink disabled:opacity-60"
+                  @click="buy">
+            {{ busy ? 'Opening checkout…' : 'Buy the audit' }}
+          </button>
+          <a v-else :href="site.contactUrl"
              class="mt-6 inline-block rounded-lg bg-brand px-4 py-2 text-[14px] font-medium text-white hover:bg-brand-ink">
             Request a quote
           </a>
+          <p v-if="error" class="mt-3 text-[13px] leading-relaxed text-muted">{{ error }}</p>
+          <p class="mt-3 text-[12px] leading-relaxed text-faint">
+            Paid through Paddle — the seller of record. Invoices, VAT/GST and refunds are handled
+            by them; we never see your card details.
+          </p>
         </section>
       </div>
 

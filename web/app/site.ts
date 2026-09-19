@@ -31,12 +31,31 @@ export const site = {
   /** 页面上显示的联系邮箱（必须与 contactUrl 指向同一个信箱）。 */
   contactEmail: 'iverson.wuwei@gmail.com',
   /**
-   * 一次性审计的起价。**定价是业务决定**，所以留成配置：
+   * 一次性审计的价格。**定价是业务决定**，所以留成配置：
    * 没定之前页面会显式说明"按次报价、不在此公布"，而不是编一个数字。
+   *
+   * 注意：这一行必须与 Paddle 后台那个价格（paddle.priceId）一致。
+   * 页面写 1500、收银台收 2000，是合规问题，不是文案问题——改一处要改两处。
    */
-  auditPrice: 'discussed per engagement',
-  /** 定价一旦确定，把它设成 true，页面上那句"给审核方看的说明"就会消失。 */
-  auditPriceIsPublished: false,
+  auditPrice: '$1,500 USD',
+  /** 定价一旦确定，把它设成 true，页面上那句"给审核方看的备注"就会消失。 */
+  auditPriceIsPublished: true,
+  /**
+   * 收银台：Paddle Billing。Paddle 是这笔交易的 Merchant of Record——
+   * 开票、代缴 VAT/GST、退款都由它处理，账单上出现的收款方也是它。
+   *
+   * clientToken 是**公开值**（本来就跑在浏览器里），写进仓库没有风险；
+   * 对应的 api key 是密值，任何情况下都不许出现在这个文件里。
+   *
+   * 站点是纯静态的，所以走 Paddle.js 的 overlay 模式：前端用 clientToken 加
+   * priceId 直接开收银台，不需要自己的后端（也就不需要存任何支付数据）。
+   */
+  paddle: {
+    clientToken: 'live_297463a10ad89aa3315d67a53d0',
+    /** 一次性商品「Agent permission audit (one engagement)」的价格 id */
+    priceId: 'pri_01m2wn60hxk03jmrdd2h0bx489',
+    environment: 'live',
+  },
   /**
    * 源码/反馈入口。仓库是发布产物的来源（GitHub Releases、brew tap、MCP Registry
    * 的 identifier 都指向它），所以这里直接给 issue 入口——**别写"源码未公开"**：

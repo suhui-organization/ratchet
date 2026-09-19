@@ -46,6 +46,28 @@ const limits = [
   'A static scan reports configs it could not parse instead of guessing.',
   'Records tool names, never arguments.',
 ] as const
+
+/**
+ * 装完之后的三个动作。这三个不是功能介绍，是**下一步该敲什么**——
+ * 落地页真正流失人的地方是"装完了，然后呢"。
+ */
+const steps = [
+  {
+    title: 'See the surface',
+    body: 'Every MCP server this machine knows about, which ones are unpinned, and which config files it could not read.',
+    cmd: 'ratchet scan --home ~',
+  },
+  {
+    title: 'Compile the policy',
+    body: 'Cross the tool surface with the calls that actually happened, and get read / write / execute / destructive separated with a reason each.',
+    cmd: 'ratchet policy draft',
+  },
+  {
+    title: 'Hand over something checkable',
+    body: 'One folder with the policy, the report and a sha256 manifest. The recipient recomputes the hashes — in a browser, on their machine.',
+    cmd: 'ratchet deliver --out delivery',
+  },
+] as const
 </script>
 
 <template>
@@ -207,6 +229,32 @@ const limits = [
               v-for="(l, i) in b.lines" :key="i" class="block text-white/85"><span class="text-white/35">$ </span>{{ l }}</span></code></pre>
           </div>
         </div>
+      </div>
+    </section>
+
+    <!-- 装完之后会发生什么：三步，从"一个数字"到"一段别人能自己验的证词" -->
+    <section id="after" class="mx-auto max-w-6xl px-6 py-16">
+      <h2 class="text-[1.35rem] font-semibold text-ink">Ten seconds after install, you have a number</h2>
+      <p class="mt-4 max-w-[62ch] text-[14.5px] leading-relaxed text-muted">
+        Not a dashboard and not a report about your industry — the count of MCP servers on
+        <em>this</em> machine, and how many of them are pinned to a version.
+      </p>
+      <ol class="mt-10 grid gap-8 sm:grid-cols-3">
+        <li v-for="(s, i) in steps" :key="s.title">
+          <span class="tnum font-mono text-[12px] text-faint">0{{ i + 1 }}</span>
+          <h3 class="mt-2 text-[15.5px] font-semibold text-ink">{{ s.title }}</h3>
+          <p class="mt-2 text-[14px] leading-relaxed text-muted">{{ s.body }}</p>
+          <code class="mt-3 inline-block rounded border border-line bg-surface-2 px-2 py-1 font-mono text-[12px] text-ink">{{ s.cmd }}</code>
+        </li>
+      </ol>
+      <div class="mt-10 flex flex-wrap items-center gap-x-7 gap-y-3 text-[15px]">
+        <NuxtLink to="/verify"
+                  class="rounded-lg border border-line px-5 py-2.5 font-medium text-ink hover:border-brand">
+          Verify a delivery
+        </NuxtLink>
+        <NuxtLink to="/pricing" class="text-brand hover:text-brand-ink hover:underline">
+          Rather have someone do it for you →
+        </NuxtLink>
       </div>
     </section>
 
