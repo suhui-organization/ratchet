@@ -1,8 +1,21 @@
 # Ratchet
 
 > **从 agent 的真实行为编译最小权限策略，并给出收货方能自己验证的证据。**
->
-> 棘轮只能往一个方向转：权限可以收紧，放宽必须显式。
+
+```bash
+curl -fsSL https://github.com/suhui-organization/ratchet/releases/latest/download/install.sh | sh
+```
+
+Linux / macOS（amd64 · arm64）。装完先跑这一条——**只读配置，不执行任何东西**：
+
+```bash
+ratchet scan --home ~
+```
+
+它会在十秒内告诉你：这台机器上有几个 MCP server，其中几个**没锁版本**。
+（我自己的机器：16 个里 12 个没锁。）
+
+棘轮只能往一个方向转：权限可以收紧，放宽必须显式。
 
 ## 这是什么
 
