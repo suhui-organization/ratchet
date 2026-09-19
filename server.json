@@ -1,0 +1,21 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
+  "name": "io.github.suhui-organization/ratchet",
+  "description": "Read-only tools for inspecting your own AI agent setup: list the MCP servers configured on this machine, flag the ones that do not pin a version, summarise a least-privilege policy, and test whether one hypothetical tool call would be allowed, denied, or need approval. Nothing is executed to build the picture - it parses config files.",
+  "version": "0.10.0",
+  "websiteUrl": "https://github.com/suhui-organization/ratchet",
+  "repository": {
+    "url": "https://github.com/suhui-organization/ratchet",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "oci",
+      "identifier": "ghcr.io/suhui-organization/ratchet",
+      "version": "0.10.0",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}
