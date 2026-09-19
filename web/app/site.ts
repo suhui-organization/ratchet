@@ -27,9 +27,9 @@ export const site = {
    */
   installUrl: 'https://github.com/suhui-organization/ratchet/releases/latest/download',
   /** 无下载地址时的联系入口。 */
-  contactUrl: 'mailto:ratchet@example.com?subject=Ratchet%20access',
+  contactUrl: 'mailto:iverson.wuwei@gmail.com?subject=Ratchet%20access',
   /** 页面上显示的联系邮箱（必须与 contactUrl 指向同一个信箱）。 */
-  contactEmail: 'ratchet@example.com',
+  contactEmail: 'iverson.wuwei@gmail.com',
   /**
    * 一次性审计的起价。**定价是业务决定**，所以留成配置：
    * 没定之前页面会显式说明"按次报价、不在此公布"，而不是编一个数字。
@@ -37,6 +37,10 @@ export const site = {
   auditPrice: 'discussed per engagement',
   /** 定价一旦确定，把它设成 true，页面上那句"给审核方看的说明"就会消失。 */
   auditPriceIsPublished: false,
-  /** 源码获取方式（仓库暂不公开，写清楚而不是留假链接）。 */
-  sourceNote: 'Source is not public yet. The build is reproducible from the commands below.',
+  /**
+   * 源码/反馈入口。仓库是发布产物的来源（GitHub Releases、brew tap、MCP Registry
+   * 的 identifier 都指向它），所以这里直接给 issue 入口——**别写"源码未公开"**：
+   * 一个讲证据的产品在首页上写一句能被一条 curl 证伪的话，比不写更糟。
+   */
+  sourceNote: 'Source and issues: github.com/suhui-organization/ratchet — these releases are built from this repo.',
 } as const

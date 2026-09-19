@@ -1,0 +1,42 @@
+# 出口 vhost 模板：由 deploy/swr/set-edge-domain.sh 渲染后写到 web01 的
+# /data/service/nginx/conf/vhost/<domain>.conf。
+#
+# 前置反向代理在 web01（192.168.66.10），TLS 用通配符证书 *.dlszjr.com，
+# 按 server_name 分流到集群里各服务的 NodePort。这里只做一件事：把域名转到
+# Ratchet 站点的 NodePort。没有 rewrite、没有子路径——站点的缓存与安全头
+# 写在镜像内的 nginx 配置里（deploy/docker/nginx.conf），一处生效。
+
+server {
+    listen 80;
+    server_name __DOMAIN__;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name __DOMAIN__;
+
+    ssl_certificate     /data/service/nginx/conf/ssl/dlszjr.com.pem;
+    ssl_certificate_key /data/service/nginx/conf/ssl/dlszjr.com.key;
+    ssl_session_cache   shared:SSL:1m;
+    ssl_session_timeout 5m;
+    ssl_ciphers         HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+
+    client_max_body_size 100m;
+
+    location / {
+        proxy_pass http://__UPSTREAM__;
+        proxy_http_version 1.1;
+        proxy_redirect off;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Port $server_port;
+        proxy_connect_timeout 30s;
+        proxy_read_timeout 60s;
+        proxy_send_timeout 60s;
+    }
+}

@@ -1,0 +1,49 @@
+# Ratchet 站点部署默认值。
+#
+# 站点是纯静态的，所以这份 values 里没有数据库、没有密钥、没有 PVC——
+# "没有状态"本身就是要保持的性质：任何一台节点都能跑，丢了 Pod 也不丢数据。
+
+image:
+  # 镜像仓库前缀。公开场景留空（走 Docker Hub）；私有化部署填 SWR 前缀，例如
+  #   swr.ap-southeast-3.myhuaweicloud.com/digital-finance
+  repositoryPrefix: ""
+  # 私仓拉取密钥名列表（华为 SWR：先在命名空间里建 docker-registry Secret，再填名字）
+  pullSecrets: []
+  web:
+    repository: ratchet-web
+    tag: "0.12.0"
+    pullPolicy: IfNotPresent
+
+web:
+  replicaCount: 2
+  # 显式钉节点用 {"kubernetes.io/hostname":"hadoop8"}；留空 = 让调度器自己挑
+  nodeSelector: {}
+  # 默认按 hostname 做软反亲和（见 template）：3 节点集群上自然铺开，
+  # 节点不够时也不会把 Pod 卡在 Pending。
+  topologySpreadConstraints: []
+  # 静态站点：先起新的再退旧的，用户不会看到 502
+  updateStrategy:
+    maxUnavailable: 0
+    maxSurge: 1
+  port: 80
+  # 集群外要访问时用 NodePort（前置反向代理由它转发）；只有 Ingress 时用 ClusterIP
+  serviceType: NodePort
+  nodePort: 30090
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+ingress:
+  # 这台集群的对外入口是宿主 nginx（web01）反代到 NodePort，不走 Ingress，
+  # 所以默认关闭；要用 ingress-nginx 的集群把它打开即可。
+  enabled: false
+  host: ratchet.internal.local
+  className: ""
+  annotations: {}
+  tls:
+    enabled: false
+    secretName: ""

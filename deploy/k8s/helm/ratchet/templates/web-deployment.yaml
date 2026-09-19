@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ratchet.web.fullname" . }}
+  labels:
+    {{- include "ratchet.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.web.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "ratchet.web.fullname" . }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      {{- toYaml .Values.web.updateStrategy | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "ratchet.web.fullname" . }}
+    spec:
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.web.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      # 软反亲和：默认尽量铺到不同节点，节点不够也不至于 Pending。
+      # （FinHarness 用的是硬反亲和 + maxSurge:0，那是为了 3 副本固定一节点一个；
+      #   静态站点没有这个需求，用软约束换调度灵活性。）
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: {{ include "ratchet.web.fullname" . }}
+                topologyKey: kubernetes.io/hostname
+      {{- with .Values.web.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      terminationGracePeriodSeconds: 10
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: web
+          image: {{ include "ratchet.image" (dict "prefix" .Values.image.repositoryPrefix "repository" .Values.image.web.repository "tag" .Values.image.web.tag) | quote }}
+          imagePullPolicy: {{ .Values.image.web.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.web.port }}
+          # nginx 的 alpine 官方镜像默认以 root 起主进程、再降权到 nginx worker，
+          # 这里只收掉它能不用就不要的能力；只读根文件系统需要额外挂 3 个可写卷，
+          # 对静态站点收益有限，暂不做（要做的话参照 FinHarness 的 web-deployment）。
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+              add: ["NET_BIND_SERVICE", "CHOWN", "DAC_OVERRIDE", "SETUID", "SETGID"]
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          lifecycle:
+            preStop:
+              exec:
+                # 先摘 endpoint 再收 SIGTERM，避免滚动时打到正在退出的 Pod
+                command: ["/bin/sh", "-c", "sleep 3"]
+          resources:
+            {{- toYaml .Values.web.resources | nindent 12 }}

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: ratchet
+description: Ratchet 站点（纯静态：落地页 / 定价 / 法务 / 验证页）
+type: application
+version: 0.1.0
+appVersion: "0.12.0"

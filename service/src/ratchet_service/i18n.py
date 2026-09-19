@@ -153,8 +153,12 @@ def _normalize(raw: str | None) -> str | None:
         return "zh-CN"
     if s.startswith("en"):
         return "en-US"
-    if s in ("c", "posix"):
-        return None          # 没给语言信息，继续往下找
+    # "C" / "POSIX" 是"没有语言偏好"，不是一种语言。必须连 C.UTF-8 这类
+    # 带上编码后缀的写法一起认——CI 与容器里默认就是 LC_ALL=C.UTF-8，
+    # 只匹配裸的 "c" 会让这类环境漏到下一层 LANG（常见是 zh_CN.UTF-8），
+    # 于是"默认英文产物"在别人机器上变成中文，而本机测试却是绿的。
+    if s == "posix" or s.startswith("posix.") or s == "c" or s.startswith("c."):
+        return None
     return None
 
 

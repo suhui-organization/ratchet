@@ -1,0 +1,12 @@
+Ratchet 站点已发布到命名空间 {{ .Release.Namespace }}。
+
+  集群内地址: http://{{ include "ratchet.web.fullname" . }}:{{ .Values.web.port }}
+{{- if eq (default "ClusterIP" .Values.web.serviceType) "NodePort" }}
+  节点 NodePort: http://<任一节点 IP>:{{ .Values.web.nodePort }}
+{{- end }}
+
+自检（在能访问集群的机器上）:
+  kubectl -n {{ .Release.Namespace }} get deploy,pods,svc
+  kubectl -n {{ .Release.Namespace }} exec deploy/{{ include "ratchet.web.fullname" . }} -- wget -qO- http://127.0.0.1/healthz
+
+出口域名由宿主 nginx（web01）反代到上面的 NodePort，见 deploy/swr/README.md。

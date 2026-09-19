@@ -1,0 +1,24 @@
+# Ratchet 远程集群（192.168.66.8）收敛值——**不含密钥**，可以进仓库。
+#
+# 单一写者原则：chart + 这份 values 是唯一事实源，镜像 tag 只写在这里。
+# 不要用 kubectl set image 改已经在 helm 管理下的 Deployment：release 里记的还是
+# 旧 tag，下一次 helm upgrade/rollback 会把线上静默回退（FinHarness 上踩过这个坑）。
+#
+# 发布流程见 deploy/swr/README.md：build-push → sync-deploy → deploy-remote → check-drift。
+
+image:
+  repositoryPrefix: swr.ap-southeast-3.myhuaweicloud.com/digital-finance
+  pullSecrets:
+    - name: ratchet-swr
+  web:
+    # 发版时改这一行（tag 跟内容走，形如 <版本>-<短 sha>）
+    tag: "0.12.0-bootstrap"
+
+web:
+  replicaCount: 2
+  serviceType: NodePort
+  # 出口：web01 的 nginx 把 podcloud.dlszjr.com 反代到 192.168.66.8:30090
+  nodePort: 30090
+
+ingress:
+  enabled: false
