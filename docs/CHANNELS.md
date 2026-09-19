@@ -17,9 +17,9 @@
 | punkpeye/awesome-mcp-servers | 待审 | [PR #14700](https://github.com/punkpeye/awesome-mcp-servers/pull/14700)，机器人要求先有 Glama 徽章 |
 | awesome-ai-security-tools | 待审 | [PR #117](https://github.com/scadastrangelove/awesome-ai-security-tools/pull/117)，按规则进观察名单 |
 | Smithery | 待做 | 需要 `smithery.yaml` + 账号授权 |
-| PulseMCP | 阻塞 | 表单站有 bot 防护，内置浏览器打不开；它抓官方 Registry，可能自然收录 |
-| mcp.so | 阻塞 | `/submit` 跳登录，需要账号态 |
-| mcpmarket.com | 待做 | `/submit` 可访问（200），下一轮提交 |
+| PulseMCP | 阻塞 | `/submit` 用 curl 能取到 200，但**内置浏览器导航超时**（bot 防护）。它抓官方 Registry，我们已在那上面，大概率自然收录 |
+| mcp.so | 阻塞 | `/submit` 返回 307 跳登录，需要账号态 |
+| mcpmarket.com | 阻塞 | 同上：curl 200，但**内置浏览器导航超时**（2026-09-20 实测） |
 | wong2/awesome-mcp-servers | 阻塞 | 仓库**禁用 PR 与 issue**，零入口；条目已在 fork 分支备好 |
 | npm 包名占位（`npx ratchet-mcp`） | 待做 | 需要 npm token；MCP 圈子的安装直觉是 npx |
 
@@ -56,6 +56,11 @@
 | YouTube / Demo 外联 | 待做 | 找 3–5 个做 MCP 测评的小频道 |
 
 ## 纪律（对所有渠道生效）
+
+> **目录层的结论（2026-09-20）**：能提交的都已提交（官方 Registry / Glama / Docker Catalog /
+> 两个 awesome 清单）；剩下的三个目录（PulseMCP、mcp.so、mcpmarket）**全部卡在反爬或账号态**上，
+> 内置浏览器连页面都打不开。继续在这一层投入的边际收益很低——它需要的是**人工在普通浏览器里
+> 逐个填表**，或者干脆等官方 Registry 的级联。
 
 1. 只回**自己说出痛点**的人，不追着产品推广帖回复；
 2. 回复里放事实与数字，**不带链接、不提产品名**；
