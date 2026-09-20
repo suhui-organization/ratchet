@@ -64,6 +64,7 @@ def build_attestation(
     evidence: list[tuple[str, bytes]] | None = None,
     generated_at: datetime | None = None,
     validity_days: int = DEFAULT_VALIDITY_DAYS,
+    exemptions: dict | None = None,
 ) -> dict:
     """policy.json（+ 可选的 inventory / 证据文件）→ ASAS-A 凭据。
 
@@ -96,6 +97,7 @@ def build_attestation(
 
     unknown: list[dict] = []
     assets: list[dict] = []
+    exemptions = exemptions or {}
     for server in sorted(tools_by_server):
         tools = sorted(tools_by_server[server])
         # 描述哈希取自我们真正看到的东西：该 server 下工具名与依据的规范文本。
@@ -113,6 +115,8 @@ def build_attestation(
                 # 不能一律退化成 unknown——那会浪费这份凭据的信息量。
                 "version": (facts.get(server, {}).get("ref") or None),
                 "pinned": facts.get(server, {}).get("pinned"),
+                # 书面豁免写进凭据本身（ASAS-3.1）
+                **({"exemptUntil": exemptions[server]} if server in exemptions else {}),
                 "contentHash": None,
                 "descHash": _sha256_text(descriptor),
                 "reachableTools": reachable.get(server),

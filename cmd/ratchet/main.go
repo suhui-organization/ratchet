@@ -229,6 +229,7 @@ func cmdDeliver(args []string) int {
 	lang := fs.String("lang", "", "产物语言：en-US（默认）/ zh-CN")
 	only := fs.Bool("only-observed", false, "只授予被观测到调用过的工具")
 	reportCmd := fs.String("report-cmd", "ratchet-report", "报告生成器命令")
+	exempt := fs.String("exempt", "", "未定版组件的书面豁免：name=YYYY-MM-DD，多个用逗号分隔（ASAS-3.1）")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -253,6 +254,7 @@ func cmdDeliver(args []string) int {
 		Home: *home, Workdir: *work, Calls: *calls, OutDir: *out,
 		Agent: *agent, Lang: loc, OnlyObserved: *only, Client: *client,
 		ReportCmd: strings.Fields(*reportCmd),
+		Exemptions: splitExemptions(*exempt),
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "交付失败：%v\n", err)
@@ -835,4 +837,14 @@ func orDash(s string) string {
 		return "—"
 	}
 	return s
+}
+// splitExemptions 把逗号分隔的 "name=YYYY-MM-DD" 拆成列表，顺手去掉空白与空项。
+func splitExemptions(raw string) []string {
+	var out []string
+	for _, item := range strings.Split(raw, ",") {
+		if item = strings.TrimSpace(item); item != "" {
+			out = append(out, item)
+		}
+	}
+	return out
 }

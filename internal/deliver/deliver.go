@@ -37,6 +37,9 @@ type Options struct {
 	Client       string // 写进报告封面的客户名
 	// ReportCmd 是报告生成器。默认就是文档里那条命令。
 	ReportCmd []string
+	// Exemptions 是 "name=YYYY-MM-DD" 形式的书面豁免（ASAS-3.1）：
+	// 明知未定版而接受，必须写进凭据让收货方看得见，而不是被悄悄放过。
+	Exemptions []string
 }
 
 // Result 是每一步的产物路径，打印给使用者。
@@ -169,6 +172,9 @@ func Run(opts Options) (Result, error) {
 	attArgs := append([]string{}, opts.ReportCmd...)
 	attArgs = append(attArgs, "asas",
 		"--policy", policyPath, "--dir", delivery, "--org", org, "--owner", owner)
+	for _, item := range opts.Exemptions {
+		attArgs = append(attArgs, "--exempt", item)
+	}
 	if inv := filepath.Join(opts.OutDir, "serverfacts.json"); fileExists(inv) {
 		attArgs = append(attArgs, "--inventory", inv)
 	}

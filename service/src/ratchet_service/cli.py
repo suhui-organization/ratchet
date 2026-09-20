@@ -46,6 +46,8 @@ def main(argv: list[str] | None = None) -> int:
     p_asas.add_argument("--owner", default="unassigned", help="agent 的具名责任人")
     p_asas.add_argument("--inventory", default="", help="scan --introspect 的产物（给了才知道工具面）")
     p_asas.add_argument("--json", action="store_true", help="以 JSON 打印验证报告")
+    p_asas.add_argument("--exempt", action="append", default=[],
+                        help="未定版组件的书面豁免：name=YYYY-MM-DD（可重复，ASAS-3.1）")
 
     args = parser.parse_args(argv)
 
@@ -111,6 +113,7 @@ def _asas(args) -> int:
         owner=args.owner,
         inventory=inventory,
         evidence=evidence,
+        exemptions=_parse_exemptions(args.exempt),
     )
     out = asas_build.write(attestation, directory / "attestation.json")
 
@@ -180,6 +183,19 @@ def bundle(directory: Path, out: Path) -> Path:
         "artifacts": artifacts,
     }
     out.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return out
+
+
+def _parse_exemptions(items) -> dict:
+    """把 ``name=YYYY-MM-DD`` 解析成 ``{name: date}``。格式不对就直接报错——
+    豁免是"明知不合规而接受"的东西，不接受含糊输入。"""
+    out = {}
+    for item in items or []:
+        name, _, when = str(item).partition("=")
+        name, when = name.strip(), when.strip()
+        if not name or not when:
+            raise SystemExit(f"错误：--exempt 需要 name=YYYY-MM-DD 形式，收到 {item!r}")
+        out[name] = when
     return out
 
 

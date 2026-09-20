@@ -3,6 +3,7 @@
 import json
 
 from ratchet_service import asas, asas_build
+from datetime import datetime, timezone
 
 POLICY = {
     "version": "ratchet-policy/v1",
@@ -65,6 +66,34 @@ def test_server_facts_turn_unknown_into_known():
     # 内容哈希仍然未知：本机扫描拿不到制品本体，这一步不能假装
     assert by_name["filesystem"]["contentHash"] is None
     assert "filesystem: contentHash" in declared
+
+
+def test_written_exemption_makes_unpinned_compliant():
+    """ASAS-3.1：未定版 + 书面豁免 + 到期日 = 合规；豁免本身留在凭据里供收货方查看。"""
+    facts = [
+        {"name": "kubernetes", "ref": "mcp-server-kubernetes", "pinned": False},
+        {"name": "filesystem", "ref": "filesystem-mcp@1.2.3", "pinned": True},
+    ]
+    att = asas_build.build_attestation(
+        POLICY, org="acme", inventory=facts,
+        exemptions={"kubernetes": "2026-12-31T00:00:00Z"},
+    )
+    kubernetes = next(a for a in att["assets"] if a["name"] == "kubernetes")
+    assert kubernetes["exemptUntil"] == "2026-12-31T00:00:00Z"
+    report = asas.verify(att, now=datetime(2026, 9, 20, tzinfo=timezone.utc))
+    pinned_rule = next(r for r in report.results if r.rule == "allPinnedOrExempt")
+    assert pinned_rule.status == asas.PASS, pinned_rule.details
+
+
+def test_expired_exemption_is_not_compliant():
+    facts = [{"name": "kubernetes", "ref": "mcp-server-kubernetes", "pinned": False}]
+    att = asas_build.build_attestation(
+        POLICY, org="acme", inventory=facts,
+        exemptions={"kubernetes": "2026-09-01T00:00:00Z"},  # 已经过期
+    )
+    report = asas.verify(att, now=datetime(2026, 9, 20, tzinfo=timezone.utc))
+    pinned_rule = next(r for r in report.results if r.rule == "allPinnedOrExempt")
+    assert pinned_rule.status == asas.FAIL, "过期的豁免必须失效，否则'豁免'就成了永久赦免"
 
 
 def test_self_check_passes_on_generated_attestation():
