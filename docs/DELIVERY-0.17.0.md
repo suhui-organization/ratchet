@@ -158,3 +158,30 @@ HTTP 200  ok = True · 未评估：['silenceIsAuditable']
 | T20 | 把 V8/V9 送给外部评审（评审稿已更新到 8 条） | 至少 1 位不相关的人能照着判，或指出判不了的地方 |
 | T21 | 事件流接入（`silenceIsAuditable` 从"未评估"变可评） | hook 采集的事件带序号与前序哈希，断流能被检出 |
 | T22 | 跨组织/联合身份的委派模型 | 两个组织之间的委派要么被安全支持，要么在规范里明确排除 |
+
+## 8. 镜像与 pinnable 版本
+
+```console
+$ make images IMAGE_TAG=0.1.0-p4b          # 构建（provenance 关掉，见 0.16.0 §3.5）
+$ docker push …/asas-api:0.1.0-c5503cb     # 用提交号重新打 tag
+api    swr.ap-southeast-3.myhuaweicloud.com/digital-finance/asas-api@sha256:7d6d66463c7fd06803ac41d652d8e2c5b89392b4d22d77ed771cbdee94cbf549
+sensor swr.ap-southeast-3.myhuaweicloud.com/digital-finance/asas-sensor@sha256:0e6dc626f435e0fe5089ebc853ff7565d7f7a36b8f2fab6fb9a620aad02ccc4e
+```
+
+两个 tag（`0.1.0-p4b` 与 `0.1.0-c5503cb`）指向**同一个镜像 ID**——
+这是有意验证过的：镜像内容确实来自提交 `c5503cb`，而不是"构建完又改了代码"。
+`values-remote.yaml` / `values-local.yaml` 里的 tag 已同步到 `0.1.0-c5503cb`。
+
+**控制面在本地集群的当前状态**：`ns=asas` 里 `asas-api` 0.1.0-p4b Running，
+`asas-sensor` CronJob 每天 09:00 跑一趟（默认离线）。台账里现有 5 份凭据
+（acme 的父/子×2，kind-demo 的新旧两份）。
+
+复现遏制与查询：
+
+```bash
+kubectl -n asas port-forward svc/asas-api 18081:8080 &   # 终端里跑，别让它被挂断
+export ASAS_API=http://127.0.0.1:18081
+./bin/ratchet reach --subject secrets
+./bin/ratchet contain --agent orch-agent --reason "…"        # 只预告
+./bin/ratchet contain --agent orch-agent --reason "…" --yes  # 真吊销
+```
