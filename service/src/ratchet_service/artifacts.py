@@ -7,18 +7,91 @@
 
 纪律：任何失败（离线、包不存在、超时）一律返回 ``None``，由调用方写进 ``unknown[]``。
 **绝不"拿不到就当没问题"**——那正是这份标准要防的东西。
+
+**出网必须有界。** 传感器跑在没有人在旁边的机器上（CI、客户内网）。本机实测：
+kind 里的采集卡在 ``SYN_SENT``，每个请求各等 20 秒，一趟走完要好几分钟——而结论
+还是 unknown。所以这里有两道闸：
+
+* ``RATCHET_OFFLINE=1``：一步都不出网。**不是降级**——unknown 在规范里是一等公民，
+  而且"传感器偷偷往 registry 发请求"本身就是客户内网里的一个噪声源。
+* ``RATCHET_HTTP_BUDGET``（默认 60 秒）：整趟的总出网预算，用完就全部记 unknown，
+  不会再让下一个包再等一轮。剩下的时间用来把凭据交出去。
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import os
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
 
 # 这些"版本"等于没锁（与 internal/discover 的 pinned 判定保持一致）
 _FLOATING = {"", "latest", "next", "beta", "canary", "alpha", "dev"}
+
+# 单个请求的超时上限。
+DEFAULT_TIMEOUT = 20
+# 整趟出网的总预算（秒）。
+DEFAULT_BUDGET = 60
+
+_TRUE = {"1", "true", "yes", "on"}
+
+# 预算的起点：第一次真的要用网时才开始计时，凭据生成之前的耗时不算在里面。
+_budget_started: float | None = None
+# 上一次为什么没取：None=试过了，'offline'/'budget'=压根没试。
+_skip: str | None = None
+
+
+def offline() -> bool:
+    return os.environ.get("RATCHET_OFFLINE", "").strip().lower() in _TRUE
+
+
+def _timeout(default: int = DEFAULT_TIMEOUT) -> int:
+    try:
+        value = int(os.environ.get("RATCHET_HTTP_TIMEOUT", "").strip() or default)
+    except ValueError:
+        value = default
+    return value if value > 0 else default
+
+
+def _budget(default: int = DEFAULT_BUDGET) -> float:
+    try:
+        value = float(os.environ.get("RATCHET_HTTP_BUDGET", "").strip() or default)
+    except ValueError:
+        value = default
+    return value if value > 0 else float(default)
+
+
+def reset_budget() -> None:
+    """重新开始计时。一次交付跑一趟，跑第二趟不该继承上一趟的余量。"""
+    global _budget_started, _skip
+    _budget_started, _skip = None, None
+
+
+def skip_reason() -> str | None:
+    """上一次哈希调用是被哪道闸挡下的（``None`` = 真的试过了）。
+
+    调用方要拿它写进 ``unknown[].why``：**"没试"和"试了没成"是两种事实**，
+    凭据里不能都写成一句"取不到"。
+    """
+    return _skip
+
+
+def _gated() -> bool:
+    """是否应当放弃出网。挡下时顺手记下原因。"""
+    global _budget_started, _skip
+    if offline():
+        _skip = "offline"
+        return True
+    if _budget_started is None:
+        _budget_started = time.monotonic()
+    if time.monotonic() - _budget_started > _budget():
+        _skip = "budget"
+        return True
+    _skip = None
+    return False
 
 
 def parse_npm_ref(ref: str) -> tuple[str, str | None]:
@@ -52,12 +125,18 @@ def _get(url: str, timeout: int, *, binary: bool):
         return None
 
 
-def hash_npm_package(ref: str, timeout: int = 20) -> tuple[str, str] | None:
+def hash_npm_package(ref: str, timeout: int | None = None) -> tuple[str, str] | None:
     """返回 ``(解析到的版本, "sha256:<hex>")``；任何一步失败都返回 None。
 
     哈希对象是 **tarball 本身**，不是解包后的内容树：前者是"这个制品"，
     而且 registry 侧任何人都能独立复算。
+
+    出网前先过两道闸（离线 / 预算，见模块头）。挡下时**不重试、不等待**，
+    立刻返回 None 并把原因留在 :func:`skip_reason` 里。
     """
+    if _gated():
+        return None
+    timeout = timeout if timeout is not None else _timeout()
     name, version = parse_npm_ref(ref)
     if not name:
         return None

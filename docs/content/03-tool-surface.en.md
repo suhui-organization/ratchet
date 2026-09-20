@@ -104,7 +104,7 @@ Curious whether other people's servers answer the enumeration — I lost 4 of 16
 
 ```bash
 # 1) 列工具：会真的启动 server（本地 server 走 stdio，远程的暂不支持）
-ratchet scan --home ~ --introspect --out inventory.json
+ratchet scan --home ~ --introspect --allow-exec --out inventory.json
 
 # 2) 编译策略：三态 + 每条判定写出依据
 ratchet policy draft --from inventory.json --out policy.json

@@ -1,4 +1,4 @@
-.PHONY: test go-test py-test web-test build fmt dist release
+.PHONY: test go-test py-test web-test build fmt dist release images push-images
 
 GO ?= go
 PY ?= python3
@@ -91,3 +91,29 @@ release: dist
 
 fmt:
 	$(GO) fmt ./...
+
+# ---- 控制面/传感器镜像 -------------------------------------------------------
+# 为什么要写进 Makefile 而不是每次手敲 docker build：
+#   `docker build` 默认会给镜像加 provenance/SBOM 证明，产物是一个 OCI index；
+#   **华为 SWR 不接受这种 index**，push 时报
+#     error from registry: Invalid image, fail to parse 'manifest.json'
+#   （本机实测，见 docs/DELIVERY-0.16.0.md）。所以这里必须显式关掉。
+#
+# 为什么镜像要用 digest 而不是 tag 部署：
+#   同一个 tag 可以被推成另一个镜像，digest 不会——"跑的是哪一份代码"必须可回答。
+IMAGE_PREFIX ?= swr.ap-southeast-3.myhuaweicloud.com/digital-finance
+IMAGE_TAG ?= $(VERSION)-$(shell git rev-parse --short HEAD)
+BUILD_FLAGS ?= --provenance=false --sbom=false
+
+images:
+	docker build $(BUILD_FLAGS) -f deploy/docker/asas-api.Dockerfile -t $(IMAGE_PREFIX)/asas-api:$(IMAGE_TAG) .
+	docker build $(BUILD_FLAGS) -f deploy/docker/sensor.Dockerfile -t $(IMAGE_PREFIX)/asas-sensor:$(IMAGE_TAG) .
+	@echo "打好了，tag=$(IMAGE_TAG)。推送用 make push-images"
+
+push-images: images
+	docker push $(IMAGE_PREFIX)/asas-api:$(IMAGE_TAG)
+	docker push $(IMAGE_PREFIX)/asas-sensor:$(IMAGE_TAG)
+	@echo
+	@echo "把下面这两个 digest 填进 Helm values（sensor.image.digest / image.api.digest）："
+	@docker inspect $(IMAGE_PREFIX)/asas-api:$(IMAGE_TAG) --format '  api    {{index .RepoDigests 0}}'
+	@docker inspect $(IMAGE_PREFIX)/asas-sensor:$(IMAGE_TAG) --format '  sensor {{index .RepoDigests 0}}'

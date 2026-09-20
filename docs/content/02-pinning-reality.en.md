@@ -105,7 +105,7 @@ ratchet scan --home ~
 要拿到工具数（会真的启动 server 去列工具，这一步是显式请求才发生的）：
 
 ```bash
-ratchet scan --home ~ --introspect --out inventory.json
+ratchet scan --home ~ --introspect --allow-exec --out inventory.json
 ```
 
 ## 发布纪律（贴之前再读一遍）

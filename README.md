@@ -77,7 +77,7 @@ python3 verify.py ./delivery
 
 | 命令 | 做什么 |
 |---|---|
-| `ratchet scan [--introspect] [--share page.html]` | 读 harness 配置列出 MCP server（只读，不执行）；加 `--introspect` 才连上去列工具 |
+| `ratchet scan [--introspect --allow-exec] [--share page.html]` | 读 harness 配置列出 MCP server（只读，不执行）；加 `--introspect --allow-exec` 才连上去列工具（连上就会执行配置里的命令，所以要显式开） |
 | `ratchet ingest` / `observe` | 采集真实调用（hook 出错静默退出），并对照清单看出哪些工具从没被用过 |
 | `ratchet policy draft` / `check` | 编译三态策略（每条带判定依据），并试跑一次假设调用 |
 | `ratchet deliver` / `report build` | 一条命令出交付目录：策略 + 报告 + sha256 清单 |

@@ -1,3 +1,4 @@
+{{- if .Values.api.persistence.enabled }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -11,6 +12,7 @@ spec:
     requests:
       storage: {{ .Values.api.persistence.size }}
 ---
+{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -62,8 +64,13 @@ spec:
               mountPath: /data
       volumes:
         - name: data
+          {{- if .Values.api.persistence.enabled }}
           persistentVolumeClaim:
             claimName: {{ .Values.api.persistence.existingClaim | default "asas-data" }}
+          {{- else }}
+          # 关掉持久化 = 关掉台账。只在"跑通一遍就删"的演示里用。
+          emptyDir: {}
+          {{- end }}
 ---
 apiVersion: v1
 kind: Service

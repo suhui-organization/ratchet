@@ -1,0 +1,103 @@
+{{- if .Values.sensor.enabled }}
+# 集群内传感器：定时采集宿主机上的 agent 配置 → 出凭据 → 上报控制面。
+#
+# 默认关闭（values 里 sensor.enabled=false）。为什么默认关：
+# **传感器的正确位置是有 agent 的那台机器**——集群里的 Pod 看不到开发者笔记本上的
+# harness 配置，而"agent 到底能碰什么"的答案只存在于那台机器的配置文件里。
+# 只有当"受管机器本身就是集群节点、且它的家目录能 hostPath 挂进来"时，这里的
+# 定时任务才成立；否则请在那台机器上跑 deploy/sensor/sensor.sh。
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: asas-sensor
+  labels:
+    app: asas-sensor
+spec:
+  schedule: {{ .Values.sensor.schedule | quote }}
+  timeZone: {{ .Values.sensor.timeZone | quote }}
+  # 两趟采集重叠会同时写同一份产物目录；采集本身也是只读动作，晚一趟没有意义。
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: {{ .Values.sensor.history.successful }}
+  failedJobsHistoryLimit: {{ .Values.sensor.history.failed }}
+  jobTemplate:
+    spec:
+      # 采集失败**不要**重试到天亮：失败会被控制面的"沉默"规则看见，
+      # 而重试只会把同一份失败证据写很多遍。
+      backoffLimit: 0
+      template:
+        metadata:
+          labels:
+            app: asas-sensor
+        spec:
+          restartPolicy: Never
+          {{- with .Values.image.pullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.sensor.nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          securityContext:
+            seccompProfile:
+              type: RuntimeDefault
+            {{- toYaml .Values.sensor.podSecurityContext | nindent 12 }}
+          containers:
+            - name: sensor
+              image: {{ if .Values.sensor.image.digest }}{{ printf "%s/%s@%s" (.Values.image.repositoryPrefix | trimSuffix "/") .Values.sensor.image.repository .Values.sensor.image.digest | quote }}{{ else }}{{ printf "%s/%s:%s" (.Values.image.repositoryPrefix | trimSuffix "/") .Values.sensor.image.repository .Values.sensor.image.tag | quote }}{{ end }}
+              imagePullPolicy: {{ .Values.sensor.image.pullPolicy }}
+              env:
+                - name: ASAS_API
+                  value: {{ .Values.sensor.apiURL | default (printf "http://asas-api:%v" .Values.api.port) | quote }}
+                - name: ASAS_ORG
+                  value: {{ .Values.sensor.org | quote }}
+                - name: SCAN_HOME
+                  value: {{ .Values.sensor.scanHome | quote }}
+                - name: OUT
+                  value: /data/sensor
+                # 出网必须有界：无人值守的采集"等"不出结论，只会拖长交付。
+                - name: ASAS_HTTP_BUDGET
+                  value: {{ .Values.sensor.httpBudgetSeconds | quote }}
+                {{- if .Values.sensor.offline }}
+                - name: ASAS_OFFLINE
+                  value: "1"
+                {{- end }}
+                {{- with .Values.sensor.exempt }}
+                - name: ASAS_EXEMPT
+                  value: {{ . | quote }}
+                {{- end }}
+                # 只有显式打开 sensor.allowExec 才会执行配置里写的命令（几乎总是
+                # `npx -y <包>`）。默认采集是纯只读的，这条线不许被"顺手"绕过。
+                {{- if .Values.sensor.allowExec }}
+                - name: ASAS_INTROSPECT
+                  value: "1"
+                {{- end }}
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                {{- toYaml .Values.sensor.resources | nindent 16 }}
+              volumeMounts:
+                # 宿主机家目录：**只读**。采集只需要读文件，写权限是不必要的风险面。
+                - name: host-scan
+                  mountPath: {{ .Values.sensor.scanHome }}
+                  readOnly: true
+                - name: data
+                  mountPath: /data
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: host-scan
+              hostPath:
+                path: {{ .Values.sensor.hostScanPath }}
+                type: Directory
+            # 产物目录是易失的：真正的台账在控制面（凭据已 POST 过去），
+            # 这里留一份只是为了排查"这一趟到底采到了什么"。
+            - name: data
+              emptyDir: {}
+            - name: tmp
+              emptyDir: {}
+{{- end }}

@@ -22,6 +22,23 @@ from . import asas
 DEFAULT_VALIDITY_DAYS = 30
 
 
+def _hash_unknown_reason(ref: str, hasher_supplied: bool) -> str:
+    """没算出资质哈希时，``unknown[].why`` 该怎么写。
+
+    "没试"和"试了没成"是两种事实：前者是我们的选择（离线 / 预算用尽），
+    后者是环境不给（包不存在、网络不通）。凭据里混成一句"取不到"，
+    审计的人就没法区分"这份凭据的能力边界"和"这次运气不好"。
+    """
+    from . import artifacts
+
+    reason = artifacts.skip_reason() if hasher_supplied else None
+    if reason == "offline":
+        return f"已设为离线（RATCHET_OFFLINE=1），未出网取 {ref} 的制品；据此声明 unknown"
+    if reason == "budget":
+        return f"出网预算已用尽（RATCHET_HTTP_BUDGET 秒），未取 {ref} 的制品；据此声明 unknown"
+    return f"取不到 {ref} 的制品（离线或包不存在），未计算哈希"
+
+
 def _sha256_text(text: str) -> str:
     return "sha256:" + hashlib.sha256(text.encode()).hexdigest()
 
@@ -113,7 +130,7 @@ def build_attestation(
             if got:
                 resolved_version, content_hash = got
             else:
-                content_unknown = f"取不到 {ref} 的制品（离线或包不存在），未计算哈希"
+                content_unknown = _hash_unknown_reason(ref, artifact_hasher is not None)
         # 描述哈希取自我们真正看到的东西：该 server 下工具名与依据的规范文本。
         # 它不是产物哈希——产物哈希需要制品本体，本机扫描拿不到。
         descriptor = json.dumps(

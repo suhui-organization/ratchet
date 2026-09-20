@@ -39,7 +39,7 @@
 |---|---|---|---|
 | **P0**（本轮） | 凭据闭环 | `deliver` 产出 ASAS-A + 自查 | `ratchet deliver` 结束时报"凭据自查通过"；产物通过 `asas.py` 全部可评估规则 |
 | **P1** | 控制面骨架上本地 k8s | `asas-api` + `asas-verify` + postgres 三个 Deployment | `kubectl -n asas get deploy` 全 Ready；`POST /attestations` 存取一份凭据；`POST /verify` 返回六条规则结果 |
-| **P2** | 传感器容器化 | `asas-sensor` sidecar，默认不执行 | `--introspect` 需显式 `--allow-exec`；镜像以固定 digest 运行；上报仅元数据 |
+| **P2** ✅ | 传感器容器化 | `asas-sensor` sidecar，默认不执行 | 见 §8（digest 固定运行、只读挂载、默认不出网也不执行） |
 | **P3** | CI 门禁 | GitHub Action + SARIF + 非 0 退出码 | 未定版新增会让 PR 变红；SARIF 能在 Security 标签页显示 |
 | **P4** | 委派边界与遏制 | 委派链校验 + 吊销编排 | 子 agent 放大权限被拒；"哪些 agent 曾触达 X"能查到 |
 
@@ -95,5 +95,30 @@ helm upgrade --install asas deploy/k8s/helm/asas -n asas \
 | ASAS v0.1 规范 + schema | ✅ |
 | ASAS-V 验证器 + 20 条向量 | ✅ |
 | ASAS-A 构建器 | ✅ |
-| `deliver` 接线（T2） | ⏳ 本轮之后立刻做 |
-| 本地 k8s 控制面（P1） | ⏳ 下一轮 |
+| `deliver` 接线（T2） | ✅ |
+| 本地 k8s 控制面（P1） | ✅ 部署在 kind `ns=asas`，`/verify` 与本地逐字一致 |
+| 传感器容器化（P2） | ✅ 见 §8 |
+| CI 门禁（P3，提前做掉） | ✅ `.github/workflows/asas-gate.yml` |
+| 委派边界与遏制（P4） | ⏳ 下一轮 |
+
+## 8. P2 的任务分解与结论（已完成）
+
+| # | 任务 | 状态 | 判据 / 证据 |
+|---|---|---|---|
+| T10 | 传感器脚本 + 镜像（采集 → 出证 → 上报） | ✅ | `deploy/sensor/sensor.sh`、`deploy/docker/sensor.Dockerfile`；镜像 `asas-sensor:0.1.0-p2` |
+| T11 | 集群内定时任务（默认关） | ✅ | `templates/sensor-cronjob.yaml`；`sensor.enabled=false` 时渲染结果里没有 CronJob（有用例） |
+| T12 | 默认不执行配置里的命令 | ✅ | 需要 `--allow-exec`；`ASAS_INTROSPECT=1` 才加 `--introspect`（有用例锁住顺序） |
+| T13 | 镜像以固定 digest 运行 | ✅ | SWR 侧 digest `sha256:bac7ff55…` 写进 `sensor.image.digest`，Pod 起来并跑通 |
+| T14 | 出网有界（离线 / 预算） | ✅ | `RATCHET_OFFLINE=1`、`RATCHET_HTTP_BUDGET=60`；两条闸各有用例 |
+| T15 | 落档 | ✅ | [DELIVERY-0.16.0.md](DELIVERY-0.16.0.md) |
+
+**P2 的验收输出**（真机粘贴见 DELIVERY-0.16.0.md）：一次集群内采集把凭据存进控制面
+（`{"id":"kind-demo-2026-10-20"}`），控制面 `/verify` 与本地 `asas.verify` 输出逐字一致。
+
+**这一轮学到的三件事**（都写成了用例，不靠人记）：
+
+1. 脚本里的 flag 必须真存在——`--org` 那次让容器 exit 2，采集全灭。
+2. **管道会吞掉退出码**：`curl … | head` 的退出码是 `head` 的，控制面返回 422 时
+   Pod 照样报 Completed。判断必须看 HTTP 状态码。
+3. `--set` 用逗号分隔赋值：`sensor.exempt="a=1,b=2"` 会被截断成一条豁免 + 一堆垃圾顶层键。
+   现在渲染期直接报错（`templates/values-guard.yaml`）。

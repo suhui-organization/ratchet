@@ -76,7 +76,7 @@ func usage() {
 
 用法：
   ratchet version
-  ratchet scan [--home <dir>] [--workdir <dir>] [--introspect]
+  ratchet scan [--home <dir>] [--workdir <dir>] [--introspect --allow-exec]
                [--out <清单.json>] [--share <页面.html>] [--timeout <秒>] [--json]
   ratchet observe --calls <调用记录.jsonl> [--inventory <清单.json>]
                   [--out <清单.json>] [--json]
@@ -93,7 +93,7 @@ func usage() {
 
 说明：
   scan          只读本机配置，列出装了哪些 agent、挂了哪些 MCP server。
-                默认**不执行任何东西**；加 --introspect 才会连上 server 取工具名
+                默认**不执行任何东西**；--introspect 要配 --allow-exec 才会连上 server 取工具名
                 （连上就会执行配置里写的命令，所以必须显式开启）。
                 --share 额外写一个自包含 HTML 页面，便于把结果转发给别人。
 
@@ -131,6 +131,10 @@ func usage() {
   --only-observed   只授予被观测到调用过的工具（最小权限最严格的一档）
   --lang            产物语言（默认 en-US）；CLI 自身的终端输出暂为中文
   --json            把策略 JSON 打到 stdout（不给 --out 时也能用管道接）
+
+  出网（deliver 的出证那一步会去 registry 取制品哈希，因此必须有界）：
+  RATCHET_OFFLINE=1       一步都不出网；相关字段如实记为 unknown，不是降级
+  RATCHET_HTTP_BUDGET=60  整趟出网的秒数预算，用完即停，剩下的照记 unknown
 `)
 }
 
@@ -476,6 +480,7 @@ func cmdScan(args []string) int {
 	home := fs.String("home", "", "扫描哪个 HOME（默认当前用户的）")
 	work := fs.String("workdir", "", "项目级配置所在目录（默认当前目录）")
 	introspect := fs.Bool("introspect", false, "连上每个 server 取工具名（会执行配置里的命令）")
+	allowExec := fs.Bool("allow-exec", false, "显式同意执行配置里的命令（--introspect 现在必须配它）")
 	out := fs.String("out", "", "把清单写到这个文件（需要 --introspect）")
 	timeout := fs.Int("timeout", 20, "单个 server 的 introspect 超时（秒）")
 	sharePath := fs.String("share", "", "把扫描结果写成一个自包含 HTML 页面（便于转发，无需服务端）")
@@ -502,6 +507,25 @@ func cmdScan(args []string) int {
 		// 否则用户会以为"没报错就是没问题"，实际上清单是空的。
 		fmt.Fprintln(os.Stderr, "静态扫描只知道有哪些 server，不知道它们暴露了哪些工具。")
 		fmt.Fprintln(os.Stderr, "要生成可编译的清单，请加 --introspect（会执行配置里写的命令）。")
+		return 2
+	}
+
+	// --introspect 会执行配置里写的命令（通常就是 `npx -y <包>`）——**正是本工具警告别人
+	// 不要做的那件事**：拉一个未定版的包并运行它。我们自己不能一边这么说一边这么做。
+	// 所以默认拒绝，要显式加 --allow-exec。范围最小（只影响这一个开关），但把那处
+	// 自相矛盾从"文档里的解释"变成"运行时的拒绝"。
+	if *introspect && !*allowExec {
+		fmt.Fprint(os.Stderr, `拒绝执行:--introspect 会运行配置里写的命令（几乎总是 npx -y <包>），
+而本工具的主张是"不要执行未定版的代码"——我们不该自己踩这条线。
+
+  想继续的话，显式同意：
+    ratchet scan --introspect --allow-exec
+
+  这条命令会启动你配置里的每个 MCP server。建议：
+    · 先看清楚要启动的是哪些（ratchet scan 的输出里有）
+    · 不确定的用 --exclude 排除，或在容器里跑
+    · 默认的只读扫描（不加 --introspect）永远不执行任何东西
+`)
 		return 2
 	}
 

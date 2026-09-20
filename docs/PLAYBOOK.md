@@ -93,7 +93,7 @@ cd /home/walden/Workspaces/ratchet && go build -o bin/ratchet ./cmd/ratchet
 ```bash
 # 2) 问一句再继续（这一步会执行他的 MCP server）
 #    "下一步我要连上这些 server 问它们有哪些工具，会启动它们。可以吗？"
-./bin/ratchet scan --home ~ --introspect --out inventory.json
+./bin/ratchet scan --home ~ --introspect --allow-exec --out inventory.json
 
 # 3) 如果有历史调用记录就对上；没有就跳过
 ./bin/ratchet observe --calls ~/.ratchet/calls.jsonl --inventory inventory.json --out used.json

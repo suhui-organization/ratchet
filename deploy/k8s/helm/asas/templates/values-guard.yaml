@@ -1,0 +1,17 @@
+{{/*
+值守卫：把"静默的半配置"变成渲染期的报错。
+
+真实踩过的一次：`--set sensor.exempt="a=1,b=2,c=3"` —— Helm 的 --set 用逗号分隔
+多个赋值，于是豁免列表被截成第一项，其余变成一堆无害但没人注意的**顶层键**
+（`mcp-server-docker=...` 之类）。渲染成功、部署成功、结果少了一大半豁免：
+这种"看起来配好了"的失败比直接报错贵得多。
+
+所以：顶层出现计划外的键就直接 fail，并说清怎么改。加一个值的时候，
+记得把键名加进下面的 $known。
+*/}}
+{{- $known := list "image" "api" "sensor" "global" }}
+{{- range $key, $_ := .Values }}
+{{- if not (has $key $known) }}
+{{- fail (printf "\n未知的顶层值 %q。\n最常见的原因：用 --set 传了逗号分隔的列表（--set 把逗号当赋值分隔符），\n例如 sensor.exempt=\"a=1,b=2\"。请改用 values 文件，或把逗号写成 \\, ：\n  --set sensor.exempt=\"a=1\\,b=2\"\n" $key) }}
+{{- end }}
+{{- end }}

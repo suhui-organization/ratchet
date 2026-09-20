@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -46,6 +47,10 @@ def main(argv: list[str] | None = None) -> int:
     p_asas.add_argument("--owner", default="unassigned", help="agent 的具名责任人")
     p_asas.add_argument("--inventory", default="", help="scan --introspect 的产物（给了才知道工具面）")
     p_asas.add_argument("--json", action="store_true", help="以 JSON 打印验证报告")
+    p_asas.add_argument("--offline", action="store_true",
+                        help="不出网取制品哈希（内网/无出网时用）；相关字段如实记为 unknown")
+    p_asas.add_argument("--http-budget", type=float, default=0,
+                        help="整趟出网的秒数预算（默认 60）；用完即停，剩下的记为 unknown")
     p_asas.add_argument("--exempt", action="append", default=[],
                         help="未定版组件的书面豁免：name=YYYY-MM-DD（可重复，ASAS-3.1）")
 
@@ -103,10 +108,17 @@ def main(argv: list[str] | None = None) -> int:
 def _asas(args) -> int:
     """产出 ASAS-A 凭据并自查。返回非 0 = 凭据不通过验证，不该交给收货方。"""
     from . import asas, asas_build
-    from .artifacts import hash_npm_package
+    from . import artifacts
 
     directory = Path(args.dir)
     directory.mkdir(parents=True, exist_ok=True)
+    # 出网的两道闸在 artifacts 里，CLI 只负责把它们翻译成参数：
+    # 传感器（无人值守）必须能"一步都不出网"地把凭据交出来。
+    if getattr(args, "offline", False):
+        os.environ["RATCHET_OFFLINE"] = "1"
+    if getattr(args, "http_budget", 0):
+        os.environ["RATCHET_HTTP_BUDGET"] = str(args.http_budget)
+    artifacts.reset_budget()
     policy = json.loads(Path(args.policy).read_text(encoding="utf-8"))
     inventory = json.loads(Path(args.inventory).read_text(encoding="utf-8")) if args.inventory else None
 
@@ -126,7 +138,7 @@ def _asas(args) -> int:
         inventory=inventory,
         evidence=evidence,
         exemptions=_parse_exemptions(args.exempt),
-        artifact_hasher=hash_npm_package,
+        artifact_hasher=artifacts.hash_npm_package,
     )
     out = asas_build.write(attestation, directory / "attestation.json")
 
@@ -139,6 +151,8 @@ def _asas(args) -> int:
             mark = {"pass": "✅", "fail": "❌", "not_evaluated": "—"}[result.status]
             print(f"  {mark} {result.rule}" + (f"  {result.details[0]}" if result.details else ""))
         print(f"  unknown 声明 {len(attestation['unknown'])} 条（拿不到的事实，不填假值）")
+        if artifacts.offline():
+            print("  离线模式：未出网取制品哈希（如需要，去掉 --offline 或设 RATCHET_OFFLINE=0）")
     return 0 if report.ok else 1
 
 

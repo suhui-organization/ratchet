@@ -137,7 +137,7 @@ echo '{"server":"my-tool","tool":"do_thing"}' | ratchet ingest --hook generic
 ## 装完之后
 
 ```bash
-ratchet scan --introspect --out inventory.json     # 这台机器上有什么
+ratchet scan --introspect --allow-exec --out inventory.json  # 这台机器上有什么（--introspect 会执行配置里的命令，故需显式同意）
 ratchet observe --calls ~/.ratchet/calls.jsonl --inventory inventory.json --out used.json
 ratchet policy draft --from used.json --only-observed --out policy.json
 ```

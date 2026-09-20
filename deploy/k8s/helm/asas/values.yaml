@@ -27,3 +27,60 @@ api:
     size: 1Gi
     storageClass: ""     # 空 = 集群默认
     existingClaim: ""
+
+# 可选的集群内传感器（默认关闭）。
+# 默认关是因为：**传感器的正确位置是有 agent 的那台机器**——集群里的 Pod 看不到
+# 开发者笔记本上的 harness 配置。只有当"受管机器本身就是集群节点、且 hostPath 可挂"时，
+# 这里的定时任务才有意义；否则请在那台机器上跑 deploy/sensor/sensor.sh。
+sensor:
+  enabled: false
+  schedule: "0 9 * * *"
+  # 定时任务按哪个时区解释上面的 cron。审计场景里"几点采的"要和本地工作时间对得上，
+  # 所以默认给一个明确值，而不是跟着集群节点的隐式 UTC 走。
+  timeZone: "Asia/Shanghai"
+  image:
+    repository: asas-sensor
+    tag: "0.1.0"
+    # 生产环境建议填 digest（sha256:...），填了之后模板用 repo@digest 而不是 tag——
+    # 同一个 tag 可以被推成另一个镜像，digest 不会。这就是我们要求别人做到的事。
+    digest: ""
+    pullPolicy: IfNotPresent
+  org: unknown-org
+  # 留空 = 集群内的 asas-api Service（同 namespace）。
+  apiURL: ""
+  # 要扫描的宿主目录（hostPath）。挂进来后容器只读读它。
+  hostScanPath: /home
+  # 容器里看到这棵树的路径。和 hostScanPath 不必相同，但通常设成宿主用户的家目录。
+  scanHome: /scan
+  # 书面豁免（到期即失效），形如 "chrome-devtools=2026-12-31"
+  # 多个用逗号分隔，但**用 --set 时必须把逗号写成 \, **，否则 Helm 会把它当赋值分隔符、
+  # 把表截断（templates/values-guard.yaml 会在这种情况下直接让渲染失败）。
+  # 多条豁免建议写进 values 文件。
+  exempt: ""
+  # **保持 false**。true 会让采集执行配置里写的命令（几乎总是 `npx -y <包>`），
+  # 也就是本工具劝别人别做的事。只在容器化的隔离环境里、且你清楚代价时才打开。
+  allowExec: false
+  # 是否允许传感器出网取制品哈希（registry.npmjs.org）。
+  # 默认离线：企业网络通常不给这里放行，而"卡在 SYN_SENT 上等几分钟、结论还是 unknown"
+  # 是最差的交付。离线不是降级——unknown 在规范里是一等公民，凭据会写明为什么没取。
+  offline: true
+  # 允许出网时的总预算（秒）。用完即停，剩下的条目一律如实记 unknown。
+  httpBudgetSeconds: 60
+  # hostPath 里的文件属于宿主某个 uid/gid。容器默认以 10001 跑，读不到 0750 的家目录时，
+  # 把这里改成宿主那个 uid/gid（本机 kind 的开发者家目录通常就是 1000:1000）。
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 10001
+    runAsGroup: 10001
+    fsGroup: 10001
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  history:
+    successful: 1
+    failed: 3
+  nodeSelector: {}
