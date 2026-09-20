@@ -452,3 +452,37 @@ Claude Desktop 用户下载即装——**不需要 Smithery 做中间人**，还
 - 在 CrowdStrike 工具描述攻击那条（`1wj3zmp`）下，1079 字正文经 `ax.setValue` **成功填进评论框**；
 - 但提交按钮在 shadow DOM 里：Playwright 点击超时、AX 树不暴露该按钮、Ctrl+Enter 的元素序号会失效；
 - 结论：这个渠道目前走不通，不再浪费轮次；等平台改版，或找到能穿透 shadow DOM 的点击方式再回来。
+
+### 养号进度 / 点对点回复（2026-09-20 15:30 档）
+
+**X：本轮 3 条**（每一条都在点发布前查过 `isEnabled()`——超 280 字符按钮会静默变灰）
+
+1. **@gilgoldstein**（ripwire：C++23 CLI + MCP server，报告 blast radius）：276 字符，已发
+   （帖子里已可见 `@WaldenWuwei · 1s`）。角度：变更的影响面与 **agent 的权限面是两张不同的图**；
+   附本机数字（16 MCP server / 12 未锁 / 164 可达工具）；肯定对方"标注猜测、公开失败"的纪律，
+   反问是否把未锁依赖当一等输出。
+2. **@AverageAiBro**（GitLab 19.4 把 MCP 扩到 merge MR 等全流程 + 同一套治理模型）：271 字符。
+   角度：范围会复利——加 merge 权限**之前**这台机器就已经 16/12/164；治理是容易的一半，
+   难的一半是让第三方看到每个工具能碰到什么。问：治理模型是按工具暴露，还是按角色。
+3. **@RahulSain714**（prompt injection 仍是头号风险，MCP 带来 tool poisoning 与凭据窃取）：257 字符。
+   角度：tool poisoning 多数时候不"高级"——12/16 未锁意味着 agent 读到的工具描述可以在它下面被换掉；
+   15 个工具我们不会自动批准。反问：钉制品还是调用时重读描述。
+
+**跳过**（按纪律）：$MONARK 代币帖、Dreamforce 复盘帖、cybercentry（链上供应商）、
+@AverageAiBro 的 skill-audit 发布帖（同类工具，去人家店里推销是负分）。
+
+**HN：本轮不发** —— 今天两条额度已在早前档用满（每日上限 2）。
+
+**Reddit：没有值得回的帖，按铁律什么都不发。**
+`r/mcp/new` 当页全是自荐/社群帖：LinkedIn 群、MCP Discord、Awesome 列表、某研究 agent 应用、
+某 SEC 数据 MCP server。版规明写 No astroturfing / No AI generated slop，这类帖一律不回。
+
+**两处方法纠正（对后面几轮有用）**
+
+1. **内置浏览器的 tab 带完整 Playwright API**：`tab.playwright.evaluate / locator / getByRole /
+   isEnabled / fill / click` 都能用，而且跑在**已登录的那个浏览器**里（用外挂的 Playwright
+   MCP 浏览器打开 x.com 会被弹到登录页——那是另一个 profile）。
+2. 早前记的"AX 快照只回增量 diff、取不到 `/status/` 链接"→ 实际用
+   `tab.playwright.evaluate` 直接读 `article` 里的链接很稳，本轮 5 条一次全取到。
+   **顺带**：Playwright 的 locator **会穿透 shadow DOM**，所以"Reddit 评论按钮在 shadow DOM 里
+   点不到"这个结论**可能不再成立**——本轮没有值得回的帖，没法验证；下一轮遇到真讨论帖时用它试一次。
