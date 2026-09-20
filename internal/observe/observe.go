@@ -95,6 +95,45 @@ func ReadCallsFile(path string) (Summary, error) {
 	return ReadCalls(f)
 }
 
+// ReadCallList 读**原始**调用列表，保持文件里的先后顺序。
+//
+// 为什么聚合后的 Summary 不够用：事件流要的是"第几条发生了什么"，
+// 顺序一变，整条哈希链就变了。跳过的行数与 ReadCalls 用同一条规则
+// （server/tool 缺一不可），否则两处对"一共有多少条"给出不同答案。
+func ReadCallList(r io.Reader) ([]Call, int, error) {
+	var calls []Call
+	skipped := 0
+	scanner := bufio.NewScanner(r)
+	scanner.Buffer(make([]byte, 0, 64*1024), 8*1024*1024)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		var call Call
+		if err := json.Unmarshal([]byte(line), &call); err != nil {
+			skipped++
+			continue
+		}
+		if call.Server == "" || call.Tool == "" {
+			skipped++
+			continue
+		}
+		calls = append(calls, call)
+	}
+	return calls, skipped, scanner.Err()
+}
+
+// ReadCallListFile 是 ReadCallList 的文件版。
+func ReadCallListFile(path string) ([]Call, int, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer f.Close()
+	return ReadCallList(f)
+}
+
 // Comparison 是"能力面 vs 使用面"的比对结果。
 type Comparison struct {
 	// Called 是既在清单里、也被调用过的工具。

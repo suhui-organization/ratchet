@@ -41,6 +41,15 @@ mkdir -p "$OUT"
 # 会把一对引号当成值的一部分传进去（豁免名字里多一对引号，解析就找不到条目）。
 set -- --out "$OUT" --home "$SCAN_HOME" --client "$ASAS_ORG" --workdir "$ASAS_PROJECT" \
   --report-cmd "python3 -m ratchet_service.cli"
+# 调用记录就在被扫描的那棵家目录里（hook 写在 <HOME>/.ratchet/calls.jsonl）。
+# 不指它的话，deliver 会去找容器自己的 HOME，事件流永远是空的——
+# 而"沉默可被审计"这一条就永远停在"未评估"。
+if [ -f "$SCAN_HOME/.ratchet/calls.jsonl" ]; then
+  set -- "$@" --calls "$SCAN_HOME/.ratchet/calls.jsonl"
+else
+  echo "==> 没有调用记录（$SCAN_HOME/.ratchet/calls.jsonl）：事件流会是空的"
+  echo "    hook 没接的话这很正常——凭据里会把这条规则如实记为'未评估'。"
+fi
 if [ -n "${ASAS_EXEMPT:-}" ]; then
   set -- "$@" --exempt "$ASAS_EXEMPT"
 fi
@@ -109,6 +118,34 @@ except urllib.error.HTTPError as exc:
     print(f"❌ 证据上传失败（HTTP {exc.code}）：{exc.read().decode()[:200]}")
     raise SystemExit(1)
 PY
+
+# 事件流：让控制面能判"这段时间的日志有没有被动过"（ASAS-5.3/6.6）。
+# 上传时控制面会拿它跟上次的摘要逐条比——改写过的日志在这里露馅。
+if [ -f "$OUT/delivery/events.jsonl" ]; then
+  echo "==> 上传事件流（控制面会与上次的摘要逐条比对）"
+  python3 - "$OUT" "$ASAS_API" <<'PY'
+import json, os, sys, urllib.error, urllib.request
+
+out, api = sys.argv[1], sys.argv[2]
+path = os.path.join(out, "delivery", "events.jsonl")
+events = [json.loads(line) for line in open(path, encoding="utf-8") if line.strip()]
+ident = json.load(open(os.path.join(out, "attest-response.json"), encoding="utf-8"))["id"]
+body = json.dumps({"attestationId": ident, "events": events}).encode()
+req = urllib.request.Request(api + "/events", data=body,
+                             headers={"Content-Type": "application/json"}, method="POST")
+try:
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        result = json.loads(resp.read())
+except urllib.error.HTTPError as exc:
+    print(f"❌ 事件流上传失败（HTTP {exc.code}）：{exc.read().decode()[:200]}")
+    raise SystemExit(1)
+print(f"   {result['events']} 条事件 · 摘要 {result['head'][:12]}…")
+if result.get("break"):
+    # 断流是**事件**，不是警告：它必须以非 0 退出，让人看见。
+    print(f"   ❌ 检出断流：{result['break']['reason']}")
+    raise SystemExit(1)
+PY
+fi
 
 # 顺带把验证也跑一遍：控制面与本地必须一致，不一致就该立刻知道。
 echo "==> 控制面验证（与本地自查是同一份规则）"

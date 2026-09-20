@@ -19,11 +19,20 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/suhui-organization/ratchet/internal/chain"
 	"github.com/suhui-organization/ratchet/internal/discover"
 	"github.com/suhui-organization/ratchet/internal/model"
 	"github.com/suhui-organization/ratchet/internal/observe"
 	"github.com/suhui-organization/ratchet/internal/policy"
 )
+
+// shortHash 只用于打印：完整 64 位十六进制在终端里没人读，前 12 位足够对上号。
+func shortHash(value string) string {
+	if len(value) <= 12 {
+		return value
+	}
+	return value[:12] + "…"
+}
 
 // Options 是一次交付的全部输入。
 type Options struct {
@@ -101,6 +110,31 @@ func Run(opts Options) (Result, error) {
 				Note: fmt.Sprintf("%d calls, %d used, %d never used, %d outside the inventory",
 					summary.Total, len(cmp.Called), len(cmp.Unused), len(cmp.Unknown)),
 			})
+			// ②b 事件流：把调用记录变成带哈希链的事件流（ASAS-5.3/6.6）。
+			// 没有这一步，凭据里的 "silenceIsAuditable" 永远是"未评估"——
+			// 而这一条恰恰是"监控数据可被删改而不被发现"的唯一防线。
+			eventDir := filepath.Join(opts.OutDir, "delivery")
+			if err := os.MkdirAll(eventDir, 0o755); err != nil {
+				return res, err
+			}
+			calls, skipped, err := observe.ReadCallListFile(opts.Calls)
+			if err != nil {
+				return res, fmt.Errorf("读调用记录失败：%w", err)
+			}
+			events, err := chain.Build(calls, opts.Agent)
+			if err != nil {
+				return res, err
+			}
+			eventsPath := filepath.Join(eventDir, "events.jsonl")
+			if err := chain.WriteJSONL(eventsPath, events); err != nil {
+				return res, err
+			}
+			head, count := chain.Head(events)
+			note := fmt.Sprintf("%d events · head %s", count, shortHash(head))
+			if skipped > 0 {
+				note += fmt.Sprintf(" · %d bad lines skipped（坏行会让断流看起来正常，请查）", skipped)
+			}
+			res.Steps = append(res.Steps, Step{Name: "chain", OK: skipped == 0, Note: note})
 		} else {
 			res.Steps = append(res.Steps, Step{
 				Name: "observe", OK: false,

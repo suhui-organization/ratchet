@@ -132,11 +132,21 @@ def _asas(args) -> int:
 
     # 证据只取"凭据所描述的那些文件"，显式列举而不是遍历目录——
     # 否则 attestation.json 会把自己算进自己的证据里，形成自指。
+    # events.jsonl 也在其中：事件流的哈希进了 manifest，改事件就会被 V1 抓住。
     evidence = [
         (name, (directory / name).read_bytes())
-        for name in ("policy.json", "report.md")
+        for name in ("policy.json", "report.md", "events.jsonl")
         if (directory / name).is_file()
     ]
+    # 事件流单独读一份给验证器：manifest 只钉哈希，V6 要看内容。
+    events = None
+    events_path = directory / "events.jsonl"
+    if events_path.is_file():
+        events = [
+            json.loads(line)
+            for line in events_path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
 
     # 遏制记录与委派图是一对输入：只看记录不知道谁是谁的下级，
     # 只看图不知道谁被吊销了（见 asas.rule_containment_cascades）。
@@ -155,6 +165,7 @@ def _asas(args) -> int:
         parents=parents,
         containment=state[0] if state else None,
         graph=state[1] if state else None,
+        events=events,
     )
     out = asas_build.write(attestation, directory / "attestation.json")
 

@@ -221,3 +221,92 @@ def test_reach_says_i_cannot_answer_instead_of_nobody(api):
 def test_reach_requires_a_subject(api):
     status, body = call(api, "/reach")
     assert status == 400 and "subject" in body["error"]
+
+
+# ── 事件流：能让 V6 评起来，也能抓住"改写历史" ────────────────────────────────
+def chain_events(count: int, *, tool: str = "read_file") -> list[dict]:
+    """造一条自洽的链（哈希口径与 Go 侧一致：去掉 hash 后按键排序序列化）。"""
+    import hashlib
+
+    events: list[dict] = []
+    prev = ""
+    for seq in range(count):
+        event = {"seq": seq, "prevHash": prev, "agent": "a1", "tool": tool, "decision": "allow"}
+        body = json.dumps(event, sort_keys=True, separators=(",", ":"))
+        event["hash"] = hashlib.sha256(body.encode()).hexdigest()
+        prev = event["hash"]
+        events.append(event)
+    return events
+
+
+def test_events_upload_makes_the_silence_rule_evaluable(api):
+    """T21 的判据：上传事件流之后，V6 不再是"未评估"。"""
+    att = attestation("a1")
+    ident = call(api, "/attestations", att)[1]["id"]
+    policy_bytes = json.dumps({"agent": "a1", "servers": {}}, sort_keys=True).encode()
+    call(api, "/evidence", {"attestationId": ident,
+                            "files": {"policy.json": base64.b64encode(policy_bytes).decode()}})
+
+    status, stored = call(api, "/events", {"attestationId": ident, "events": chain_events(5)})
+    assert status == 201 and stored["events"] == 5 and stored["break"] is None
+
+    status, report = call(api, "/verify", att)
+    rules = {r["rule"]: r for r in report["results"]}
+    assert rules["silenceIsAuditable"]["status"] == "pass"
+    assert report["notEvaluated"] == [], "证据与事件都齐了，不该还有未评估的规则"
+
+
+def test_a_rewritten_log_is_caught_on_the_next_upload(api):
+    """砍掉尾巴的链**自己完全自洽**——只有比对上一次的摘要才看得见。
+
+    这是"可验证的沉默"里最难的一条：本地日志被改写，单看这一次的交付毫无异常。
+    """
+    att = attestation("a1")
+    ident = call(api, "/attestations", att)[1]["id"]
+    call(api, "/events", {"attestationId": ident, "events": chain_events(5)})
+
+    # 下一次交付只交前 3 条（尾巴被砍）——链本身是自洽的
+    short = chain_events(5)[:3]
+    status, stored = call(api, "/events", {"attestationId": ident, "events": short})
+    assert status == 201
+    assert stored["break"] is not None, "断流必须被记成事件"
+    assert "改写" in stored["break"]["reason"] or "变短" in stored["break"]["reason"]
+    assert stored["break"]["expectedSeq"] == 4 and stored["break"]["actualSeq"] == 2
+
+    state = call(api, "/silence")[1]
+    assert len(state["breaks"]) == 1
+    assert state["heads"][0]["lastSeq"] == 2, "摘要更新到这一趟看到的为止"
+
+
+def test_editing_a_middle_event_is_caught_too(api):
+    """改中间一条、把 hash 字段原样留着——这最像"正常日志"，只看链头看不见。
+
+    控制面手上有上次的逐条哈希，所以它比"只比摘要"更强：能点到具体是第几条。
+    """
+    att = attestation("a1")
+    ident = call(api, "/attestations", att)[1]["id"]
+    good = chain_events(5)
+    call(api, "/events", {"attestationId": ident, "events": good})
+
+    tampered = json.loads(json.dumps(good))
+    tampered[1]["tool"] = "delete_file"
+    status, stored = call(api, "/events", {"attestationId": ident, "events": tampered})
+    assert status == 201 and stored["break"] is not None
+    assert "被改写" in stored["break"]["reason"]
+    assert "seq 1" in stored["break"]["reason"]
+
+
+def test_a_growing_chain_is_not_a_break(api):
+    """正常情况：下一趟是上一趟的延长线。不能把正常增长报成事故。"""
+    att = attestation("a1")
+    ident = call(api, "/attestations", att)[1]["id"]
+    first = chain_events(3)
+    call(api, "/events", {"attestationId": ident, "events": first})
+    status, stored = call(api, "/events", {"attestationId": ident, "events": chain_events(6)})
+    assert status == 201 and stored["break"] is None
+    assert call(api, "/silence")[1]["breaks"] == []
+
+
+def test_events_are_required_to_be_a_non_empty_list(api):
+    status, body = call(api, "/events", {"attestationId": "x", "events": []})
+    assert status == 400 and "events" in body["error"]

@@ -297,12 +297,13 @@ def build_attestation(
 def build_and_verify(policy: dict, **kwargs) -> tuple[dict, asas.Report]:
     """产出凭据并**立刻用同一套规则自查**——自己产的凭据先过自己的校验，不过就不算交付。
 
-    `parents` / `containment` / `graph` 是**验证输入**（不参与构建），所以在这里摘出来：
+    `parents` / `containment` / `graph` / `events` 是**验证输入**（不参与构建），所以在这里摘出来：
     它们决定了自查能评到几条规则，不该被塞进 build_attestation 的参数里。
     """
     parents = kwargs.pop("parents", None)
     containment = kwargs.pop("containment", None)
     graph = kwargs.pop("graph", None)
+    events = kwargs.pop("events", None)
     attestation = build_attestation(policy, **kwargs)
     evidence = kwargs.get("evidence") or []
     report = asas.verify(
@@ -311,6 +312,7 @@ def build_and_verify(policy: dict, **kwargs) -> tuple[dict, asas.Report]:
         parents=parents,
         containment=containment,
         graph=graph,
+        events=events,
     )
     return attestation, report
 

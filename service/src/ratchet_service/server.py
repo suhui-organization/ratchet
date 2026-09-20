@@ -15,10 +15,12 @@
     GET  /attestations         列表
     GET  /attestations/<id>    取全文
     POST /evidence             上传证据文件（base64），让 hashMatch 可被重算
+    POST /events               上传事件流（带哈希链），让 silenceIsAuditable 可被评估
     POST /verify               跑 ASAS-V（与 CLI 同一份实现）
     POST /contain              记录一次遏制动作，**级联到下级**（ASAS-8.5）
     GET  /contain              遏制记录
     GET  /reach?subject=<x>    谁曾能触达 X（ASAS-8.3）
+    GET  /silence              每条事件链的摘要 + 全部断流记录（ASAS-6.6）
 
 `/verify` 与「本地 CLI」的差别只有一处，而那一处正是控制面存在的理由：**它手边有台账**。
 证据文件、委派父凭据、遏制记录都能从库里自己取，所以同一份凭据在这里能被评得更全——
@@ -64,6 +66,45 @@ CREATE TABLE IF NOT EXISTS evidence (
   body           BLOB NOT NULL,
   stored_at      TEXT NOT NULL,
   PRIMARY KEY (attestation_id, name)
+);
+CREATE TABLE IF NOT EXISTS events (
+  attestation_id TEXT NOT NULL,
+  seq            INTEGER NOT NULL,
+  body           TEXT NOT NULL,
+  stored_at      TEXT NOT NULL,
+  PRIMARY KEY (attestation_id, seq)
+);
+-- 每个 (组织, agent) 的"只增摘要"：上次看到的序号与链头。
+-- 跨次比对就靠它——链自洽但被砍掉尾巴时，只有比摘要才看得出来。
+CREATE TABLE IF NOT EXISTS event_heads (
+  org        TEXT NOT NULL,
+  agent      TEXT NOT NULL,
+  last_seq   INTEGER NOT NULL,
+  head_hash  TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (org, agent)
+);
+-- 上次看到的**逐条哈希**（只存序号与哈希，不存正文）：
+-- 有了它才能发现"改了中间某一条但把哈希字段原样留着"——只比链头是看不出来的。
+CREATE TABLE IF NOT EXISTS event_prefix (
+  org   TEXT NOT NULL,
+  agent TEXT NOT NULL,
+  seq   INTEGER NOT NULL,
+  hash  TEXT NOT NULL,
+  PRIMARY KEY (org, agent, seq)
+);
+-- 断流本身是一个事件（ASAS-6.6），不是一条日志。
+CREATE TABLE IF NOT EXISTS silence_breaks (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  org            TEXT NOT NULL,
+  agent          TEXT NOT NULL,
+  reason         TEXT NOT NULL,
+  expected_seq   INTEGER,
+  actual_seq     INTEGER,
+  expected_head  TEXT,
+  actual_head    TEXT,
+  attestation_id TEXT NOT NULL,
+  detected_at    TEXT NOT NULL
 );
 """
 
@@ -218,6 +259,138 @@ def load_evidence(attestation_id: str) -> dict[str, bytes] | None:
     return {name: body for name, body in rows} if rows else None
 
 
+def store_events(attestation_id: str, events: list[dict]) -> dict:
+    """存一条事件流，并与该 agent 上次的摘要比对（ASAS-6.6）。
+
+    比什么、为什么：
+
+    * **同一个 agent 的链应当是只增的**。新交上来的链里，上一次的链头必须还在、
+      而且第 `seq` 条还是同一个哈希。不在——说明本地日志被改写（删了、改了、
+      或者覆盖过），**这本身就是事件**，记进 `silence_breaks`。
+    * 只比"链自洽"是不够的：砍掉尾巴的链完全自洽（见 test_silence.py 的用例），
+      能发现它的只有此前被引用过的摘要。
+
+    断流不阻止入库：凭据照收，事实照记。**沉默要被看见，不是被拒绝**。
+    """
+    now = datetime.now(timezone.utc).isoformat()
+    if not events:
+        return {"attestationId": attestation_id, "events": 0, "break": None}
+    ordered = sorted(events, key=lambda e: int(e.get("seq") or 0))
+    org = ""
+    agent = ""
+    for event in ordered:
+        agent = agent or str(event.get("agent") or "")
+    attestation = get_attestation(attestation_id)
+    if attestation:
+        org = str((attestation.get("subject") or {}).get("org") or "")
+    agent = agent or (attestation or {}).get("agents", [{}])[0].get("id", "") or "unknown"
+
+    # 存/比的是**重算出来的**摘要，不是事件里自称的 hash：改内容却留着旧 hash
+    # 是最像"正常日志"的篡改，只比自称值就漏了。
+    digests = {int(e.get("seq") or 0): asas.event_digest(e) for e in ordered}
+    last_seq = int(ordered[-1].get("seq") or 0)
+    head = digests[last_seq]
+
+    with _lock, connect() as conn:
+        previous = conn.execute(
+            "SELECT last_seq, head_hash FROM event_heads WHERE org = ? AND agent = ?", (org, agent)
+        ).fetchone()
+        # 逐条比对**上次看到的那些哈希**：改中间一条、把哈希字段原样留着，
+        # 只看链头是看不见的——而那恰恰是最像"正常日志"的一种篡改。
+        seen_rows = conn.execute(
+            "SELECT seq, hash FROM event_prefix WHERE org = ? AND agent = ?", (org, agent)
+        ).fetchall()
+        for event in ordered:
+            conn.execute(
+                "INSERT INTO events (attestation_id, seq, body, stored_at) VALUES (?,?,?,?) "
+                "ON CONFLICT(attestation_id, seq) DO UPDATE SET body=excluded.body, stored_at=excluded.stored_at",
+                (attestation_id, int(event.get("seq") or 0), json.dumps(event, ensure_ascii=False), now),
+            )
+
+        break_info = None
+        if previous is not None:
+            prev_seq, prev_head = int(previous[0]), str(previous[1])
+            rewritten = sorted(
+                seq for seq, hash_ in ((int(s), str(h)) for s, h in seen_rows)
+                if digests.get(seq) != hash_
+            )
+            if rewritten:
+                sample = "、".join(f"seq {s}" for s in rewritten[:3])
+                reason = f"本地日志被改写：{len(rewritten)} 条与上次不一致（{sample}…）"
+            elif last_seq < prev_seq:
+                reason = f"链变短了：上次到 seq {prev_seq}，这次只到 {last_seq}（尾巴被砍）"
+            else:
+                reason = ""
+            if reason:
+                cur = conn.execute(
+                    "INSERT INTO silence_breaks (org, agent, reason, expected_seq, actual_seq, "
+                    "expected_head, actual_head, attestation_id, detected_at) VALUES (?,?,?,?,?,?,?,?,?)",
+                    (org, agent, reason, prev_seq, last_seq, prev_head, head, attestation_id, now),
+                )
+                break_info = {
+                    "id": cur.lastrowid, "org": org, "agent": agent, "reason": reason,
+                    "expectedSeq": prev_seq, "actualSeq": last_seq,
+                    "expectedHead": prev_head, "actualHead": head, "detectedAt": now,
+                }
+        for event in ordered:
+            conn.execute(
+                "INSERT INTO event_prefix (org, agent, seq, hash) VALUES (?,?,?,?) "
+                "ON CONFLICT(org, agent, seq) DO UPDATE SET hash=excluded.hash",
+                (org, agent, int(event.get("seq") or 0), digests[int(event.get("seq") or 0)]),
+            )
+        conn.execute(
+            "INSERT INTO event_heads (org, agent, last_seq, head_hash, updated_at) VALUES (?,?,?,?,?) "
+            "ON CONFLICT(org, agent) DO UPDATE SET last_seq=excluded.last_seq, "
+            "head_hash=excluded.head_hash, updated_at=excluded.updated_at",
+            (org, agent, last_seq, head, now),
+        )
+    return {
+        "attestationId": attestation_id,
+        "org": org,
+        "agent": agent,
+        "events": len(ordered),
+        "lastSeq": last_seq,
+        "head": head,
+        "break": break_info,
+        "storedAt": now,
+    }
+
+
+def load_events(attestation_id: str) -> list[dict] | None:
+    """取回事件流。没有就是 None —— "没有事件"与"事件为空"不是一回事。"""
+    with _lock, connect() as conn:
+        rows = conn.execute(
+            "SELECT body FROM events WHERE attestation_id = ? ORDER BY seq", (attestation_id,)
+        ).fetchall()
+    return [json.loads(row[0]) for row in rows] if rows else None
+
+
+def silence_state() -> dict:
+    """每条链的当前摘要 + 全部断流记录。"""
+    with _lock, connect() as conn:
+        heads = conn.execute(
+            "SELECT org, agent, last_seq, head_hash, updated_at FROM event_heads ORDER BY org, agent"
+        ).fetchall()
+        breaks = conn.execute(
+            "SELECT id, org, agent, reason, expected_seq, actual_seq, expected_head, actual_head, "
+            "attestation_id, detected_at FROM silence_breaks ORDER BY id DESC"
+        ).fetchall()
+    return {
+        "heads": [
+            {"org": h[0], "agent": h[1], "lastSeq": h[2], "head": h[3], "updatedAt": h[4]}
+            for h in heads
+        ],
+        "breaks": [
+            {
+                "id": b[0], "org": b[1], "agent": b[2], "reason": b[3],
+                "expectedSeq": b[4], "actualSeq": b[5], "expectedHead": b[6],
+                "actualHead": b[7], "attestationId": b[8], "detectedAt": b[9],
+            }
+            for b in breaks
+        ],
+    }
+
+
 def resolve_parents(att: dict, pairs: list[tuple[dict, str]] | None = None) -> dict[str, dict]:
     """给一份凭据找它的委派父凭据（同组织、agent 名相同）。
 
@@ -271,6 +444,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(400, {"error": "subject is required, e.g. /reach?subject=filesystem"})
             pairs = stored_pairs()
             return self._send(200, containment.reach(subject, pairs, list_containment()))
+        elif self.path == "/silence":
+            # 每条链的摘要与全部断流记录：沉默要被看见。
+            return self._send(200, silence_state())
         elif self.path == "/attestations":
             self._send(200, {"attestations": list_attestations()})
         elif self.path.startswith("/attestations/"):
@@ -300,7 +476,7 @@ class Handler(BaseHTTPRequestHandler):
             report = asas.verify(
                 payload,
                 files=load_evidence(ident),
-                events=None,
+                events=load_events(ident),
                 parents=resolve_parents(payload, pairs),
                 containment=list_containment(),
                 graph=containment.graph_of(pairs),
@@ -317,6 +493,15 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(201, store_evidence(ident, files))
             except ValueError as exc:
                 return self._send(400, {"error": str(exc)})
+
+        if self.path == "/events":
+            ident = str(payload.get("attestationId") or "")
+            events = payload.get("events")
+            if not ident or not isinstance(events, list) or not events:
+                return self._send(
+                    400, {"error": "attestationId and a non-empty events array are required"}
+                )
+            return self._send(201, store_events(ident, events))
 
         if self.path == "/contain":
             agent = str(payload.get("agent") or "")

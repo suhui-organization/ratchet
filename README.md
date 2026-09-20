@@ -84,6 +84,7 @@ python3 verify.py ./delivery
 | `ratchet mcp` | 以 stdio MCP server 形态跑（`ratchet_scan` / `ratchet_policy` / `ratchet_check`） |
 | `ratchet reach --api <控制面> --subject <资产>` | 问台账"谁曾能触达 X"（ASAS-8.3）：授权面与观测面分开列，每条带依据；**台账没覆盖就直说"答不了"** |
 | `ratchet contain --api <控制面> --agent <id> [--yes]` | 吊销一个 agent，默认**级联到它的下级**（ASAS-8.5）；**默认只预告不动手**，看清单再加 `--yes` |
+| `ratchet chain --calls ~/.ratchet/calls.jsonl --out events.jsonl` | 把调用记录变成**带哈希链的事件流**（ASAS-5.3/6.6）：删行、改行、砍尾巴都会露馅。`deliver` 会自动做这一步并写进交付目录 |
 | `ratchet feedback` | 把去标识化结果整理成 issue 正文供你复制；**没有遥测，不会自动发** |
 
 拿到它的方式：`curl -fsSL https://github.com/suhui-organization/ratchet/releases/latest/download/install.sh | sh`、

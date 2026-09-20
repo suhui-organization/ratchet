@@ -1,0 +1,3 @@
+{"seq":0,"prevHash":"","ts":"2026-09-20T01:00:00Z","agent":"a1","server":"filesystem","tool":"read_file","decision":"allow","argKeys":["path"],"hash":"7c3b16af0fc8ef323ef759e5dc7be6c1d594f6b13964ce149697ce6b18e75b01"}
+{"seq":1,"prevHash":"7c3b16af0fc8ef323ef759e5dc7be6c1d594f6b13964ce149697ce6b18e75b01","ts":"2026-09-20T01:00:01Z","agent":"a1","server":"filesystem","tool":"write_file","decision":"deny","hash":"21aaac200a511cc1e88fb5d1646701d2a6359091c6330dfb8d534a5fffef1946"}
+{"seq":2,"prevHash":"21aaac200a511cc1e88fb5d1646701d2a6359091c6330dfb8d534a5fffef1946","ts":"2026-09-20T01:00:02Z","agent":"a1","server":"postgres","tool":"query","decision":"approve","hash":"8c53d9d3a654adb1f1803dfedee56bd463305cf45a37e99626e94e58213a4b49"}

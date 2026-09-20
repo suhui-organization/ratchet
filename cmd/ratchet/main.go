@@ -60,6 +60,8 @@ func main() {
 		}
 	case "deliver":
 		os.Exit(cmdDeliver(os.Args[2:]))
+	case "chain":
+		os.Exit(cmdChain(os.Args[2:]))
 	case "reach":
 		os.Exit(cmdReach(os.Args[2:]))
 	case "contain":
@@ -91,6 +93,7 @@ func usage() {
                   [--client <名字>] [--only-observed] [--lang en-US|zh-CN]
   ratchet reach --api <控制面> --subject <资产> [--json]
   ratchet contain --api <控制面> --agent <id> [--reason "…"] [--dry-run|--yes]
+  ratchet chain --calls <记录.jsonl> [--out <事件流.jsonl>] [--json]
   ratchet feedback [--kind bug|false-positive|feature] [--summary "一句话"]
   ratchet policy draft --from <清单.json> [--out <策略.json>]
                        [--agent <名字>] [--strict-unknown] [--only-observed]
@@ -135,6 +138,11 @@ func usage() {
                 那不是"没人能碰"，混了两者在事故里会出事。
   contain       吊销一个 agent，默认级联到它的下级（ASAS-8.5）。**默认只预告不动手**，
                 看清单了再加 --yes；--dry-run 是显式预演。
+
+  chain         把调用记录变成**可验证的事件流**（ASAS-5.3/6.6）：每条带单调序号与
+                前序哈希。没有它，"这段时间没有异常调用"是一句谁都能改的话——
+                删几行、改几行，没人看得出来。造链只在这里（Go），验链只在
+                ratchet-report 那边（Python），不两边各写一份。
 
   feedback      生成一段可以贴到 issue 的正文。不会自动发送任何东西：
                 路径先被折叠成 …/最后一段，你过一眼再决定发什么。

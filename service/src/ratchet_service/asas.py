@@ -388,13 +388,29 @@ def rule_silence_auditable(events: list[dict] | None) -> RuleResult:
             problems.append(f"#{index}: 序号断裂（期望 {last_seq + 1}，实际 {seq}）")
         if event.get("prevHash", "") != prev_hash:
             problems.append(f"#{index}: 前序哈希不符")
-        body = json.dumps({k: v for k, v in event.items() if k != "hash"}, sort_keys=True, separators=(",", ":"))
-        computed = _sha256_bytes(body.encode())
+        computed = event_digest(event)
         if event.get("hash") and event["hash"] != computed:
             problems.append(f"#{index}: 自身哈希不符")
         prev_hash = event.get("hash") or computed
         last_seq = seq
     return RuleResult("silenceIsAuditable", FAIL if problems else PASS, problems)
+
+
+def event_digest(event: dict) -> str:
+    """一条事件的哈希：去掉 `hash` 字段后按键排序序列化，再取 sha256。
+
+    **这个口径必须只有一份**，因为有两个地方在用：
+
+    * 这条规则（收货方重算，检查事件有没有被改）；
+    * 控制面跨次比对（把**重算值**与上次存下的重算值比，而不是比事件里自称的 hash）。
+
+    差别很要紧：只比自称的 hash，改内容、留着旧 hash 就骗过去了——
+    `test_editing_a_middle_event_is_caught_too` 说的就是这种情况。
+    """
+    body = json.dumps(
+        {k: v for k, v in event.items() if k != "hash"}, sort_keys=True, separators=(",", ":")
+    )
+    return _sha256_bytes(body.encode())
 
 
 def verify(

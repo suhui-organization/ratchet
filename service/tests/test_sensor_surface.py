@@ -106,6 +106,25 @@ def test_sensor_uploads_only_the_evidence_the_manifest_lists():
     assert re.search(r"except urllib\.error\.HTTPError[\s\S]{0,200}SystemExit\(1\)", text)
 
 
+def test_sensor_finds_call_records_inside_the_scanned_home():
+    """调用记录在**被扫描的家目录**里，不是容器自己的 HOME。
+
+    指错地方的话事件流恒为空，"沉默可被审计"就永远停在未评估——
+    而且看起来一切正常，这才是最坏的情况。
+    """
+    text = SENSOR_SH.read_text(encoding="utf-8")
+    assert '--calls "$SCAN_HOME/.ratchet/calls.jsonl"' in text
+    assert "[ -f \"$SCAN_HOME/.ratchet/calls.jsonl\" ]" in text
+    # 没有记录时要说清是"没接 hook"，而不是静默跳过
+    assert "没有调用记录" in text
+
+
+def test_sensor_treats_a_break_as_a_failure_not_a_warning():
+    text = SENSOR_SH.read_text(encoding="utf-8")
+    assert "/events" in text
+    assert re.search(r'result\.get\("break"\)[\s\S]{0,200}SystemExit\(1\)', text)
+
+
 requires_helm = pytest.mark.skipif(shutil.which("helm") is None, reason="本机没有 helm")
 
 
