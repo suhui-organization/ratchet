@@ -221,7 +221,6 @@ func declaredRef(s Server) string {
 	return ""
 }
 
-//
 // 真机数据逼出来的规则：`@latest` 看着像带版本，实际是"每次装都拉最新"——
 // 它比不写版本号还危险，因为它看起来像是被钉住了。
 func pinned(arg string) bool {

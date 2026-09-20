@@ -60,6 +60,10 @@ func main() {
 		}
 	case "deliver":
 		os.Exit(cmdDeliver(os.Args[2:]))
+	case "reach":
+		os.Exit(cmdReach(os.Args[2:]))
+	case "contain":
+		os.Exit(cmdContain(os.Args[2:]))
 	case "feedback":
 		os.Exit(cmdFeedback(os.Args[2:]))
 	case "help", "--help", "-h":
@@ -85,6 +89,8 @@ func usage() {
   ratchet mcp                                  # 以 stdio MCP server 运行
   ratchet deliver --out <目录> [--home <dir>] [--calls <记录.jsonl>]
                   [--client <名字>] [--only-observed] [--lang en-US|zh-CN]
+  ratchet reach --api <控制面> --subject <资产> [--json]
+  ratchet contain --api <控制面> --agent <id> [--reason "…"] [--dry-run|--yes]
   ratchet feedback [--kind bug|false-positive|feature] [--summary "一句话"]
   ratchet policy draft --from <清单.json> [--out <策略.json>]
                        [--agent <名字>] [--strict-unknown] [--only-observed]
@@ -123,6 +129,12 @@ func usage() {
   deliver       把一次交付的四步串成一条命令：扫描 → 观测 → 编译策略 → 出报告。
                 报告那一步调 Python 工具（ratchet-report）；它不在时不假装跑过，
                 前三步的产物照样有效。**利润率就在这四步之间。**
+
+  reach         问控制面台账："谁曾能触达 X"（ASAS-8.3）。授权面与观测面分开列，
+                每条都带依据（哪份凭据）。**台账没覆盖时会直说"答不了"**——
+                那不是"没人能碰"，混了两者在事故里会出事。
+  contain       吊销一个 agent，默认级联到它的下级（ASAS-8.5）。**默认只预告不动手**，
+                看清单了再加 --yes；--dry-run 是显式预演。
 
   feedback      生成一段可以贴到 issue 的正文。不会自动发送任何东西：
                 路径先被折叠成 …/最后一段，你过一眼再决定发什么。
@@ -257,7 +269,7 @@ func cmdDeliver(args []string) int {
 	res, err := deliver.Run(deliver.Options{
 		Home: *home, Workdir: *work, Calls: *calls, OutDir: *out,
 		Agent: *agent, Lang: loc, OnlyObserved: *only, Client: *client,
-		ReportCmd: strings.Fields(*reportCmd),
+		ReportCmd:  strings.Fields(*reportCmd),
 		Exemptions: splitExemptions(*exempt),
 	})
 	if err != nil {
@@ -862,6 +874,7 @@ func orDash(s string) string {
 	}
 	return s
 }
+
 // splitExemptions 把逗号分隔的 "name=YYYY-MM-DD" 拆成列表，顺手去掉空白与空项。
 func splitExemptions(raw string) []string {
 	var out []string

@@ -138,7 +138,9 @@ def rule_narrowing_only(att: dict, now: datetime) -> RuleResult:
         parent_id = delegation.get("from")
         child_scope = {s for s in (delegation.get("scope") or []) if s}
         if parent_id not in agents:
-            problems.append(f"{agent.get('id')}: 委派来源 {parent_id!r} 不在凭据里（未知委派链）")
+            # 父不在**同一份**凭据里：这不是缺陷，而是分工——跨凭据的委派归 V8
+            # （它要拿父凭据来比）。V2 在这里判失败会把合法架构判成违规，
+            # 也会让 V8 永远轮不到。
             continue
         parent_scope = _scope_of(att, parent_id)
         if parent_scope is None:
@@ -153,6 +155,154 @@ def rule_narrowing_only(att: dict, now: datetime) -> RuleResult:
         elif expires <= now:
             problems.append(f"{agent.get('id')}: 委派已过期（{delegation.get('expires')}）")
     return RuleResult("narrowingOnly", FAIL if problems else PASS, problems)
+
+
+# ── V8 跨凭据的委派收窄 ────────────────────────────────────────────────────────
+def _denied_of(att: dict, agent_id: str) -> set[str]:
+    """某 agent 在这份凭据里被明确拒绝的资产（ASAS-2.4 的 deny 半边）。"""
+    return {
+        str(v.get("asset"))
+        for v in att.get("verdicts") or []
+        if v.get("agent") == agent_id and v.get("decision") == "deny" and v.get("asset")
+    }
+
+
+def rule_delegation_narrows(
+    att: dict, parents: dict[str, dict] | None, now: datetime
+) -> RuleResult:
+    """V8：子 ≠ 父所在的那份凭据时，用**父的凭据**来证明收窄。
+
+    V2 只能看一份凭据内部。真实世界里父子常是两个主体、两份凭据——只看子凭据，
+    能证明的只是"它自己声称收窄了"。所以这里要三件事之一：
+
+    * 父在本凭据内 → 交给 V2，本规则跳过（不重复判定）；
+    * 父有凭据可用 → 逐条比：作用域 ⊆、deny ⊇、有效期不超出父；
+    * 父凭据不可得 → **失败**（ASAS-2.5：未知委派链视为越权）。
+
+    第三种是这条规则的立场：想用委派要权限，就得把父链条一起交出来。
+    """
+    own_agents = {a.get("id") for a in att.get("agents") or []}
+    delegations = [
+        (str(a.get("id") or ""), a.get("delegation") or {})
+        for a in att.get("agents") or []
+        if a.get("delegation")
+    ]
+    if not delegations:
+        # 没有声明任何委派 = 输入已被读过、里面没有委派。这与"没有输入"不同，
+        # 所以是 pass 而不是 not_evaluated（和 unknown[] 为空时的处理一致）。
+        return RuleResult("delegationNarrows", PASS, [])
+
+    parents = parents or {}
+    problems: list[str] = []
+    for child, delegation in delegations:
+        parent_id = str(delegation.get("from") or "")
+        if parent_id in own_agents:
+            continue  # V2 的职责
+        parent_att = parents.get(parent_id)
+        if parent_att is None:
+            problems.append(
+                f"{child}: 父 {parent_id!r} 的凭据不可得——未知委派链视为越权（ASAS-2.5）"
+            )
+            continue
+        problems.extend(_compare_delegation(att, child, parent_id, delegation, parent_att, now))
+    return RuleResult("delegationNarrows", FAIL if problems else PASS, problems)
+
+
+def _compare_delegation(
+    child_att: dict,
+    child: str,
+    parent_id: str,
+    delegation: dict,
+    parent_att: dict,
+    now: datetime,
+) -> list[str]:
+    problems: list[str] = []
+    child_scope = {str(s) for s in (delegation.get("scope") or []) if s}
+    parent_scope = _scope_of(parent_att, parent_id) or set()
+    widened = sorted(child_scope - parent_scope)
+    if widened:
+        problems.append(f"{child}: 委派放大 {widened}（不在父 {parent_id} 的作用域内）")
+
+    # deny 只增不减：父凭据里写下来的拒绝，子凭据必须也写着。
+    # 注意这不是"有没有被挡住"的问题（默认就是 deny），而是**可见性**：
+    # 丢掉一条，审阅子的凭据的人就再也看不到这条限制，只看到一片沉默。
+    dropped = sorted(_denied_of(parent_att, parent_id) - _denied_of(child_att, child))
+    if dropped:
+        problems.append(
+            f"{child}: 丢掉了父 {parent_id} 的拒绝项 {dropped}（deny 只增不减，ASAS-2.4）"
+        )
+
+    parent_to = _parse_ts(str((parent_att.get("subject") or {}).get("period", {}).get("to") or ""))
+    expires = _parse_ts(str(delegation.get("expires") or ""))
+    if parent_to is None:
+        problems.append(f"{child}: 父 {parent_id} 的凭据没有可解析的有效期，无法证明子不超出父")
+    elif parent_to <= now:
+        problems.append(f"{child}: 父 {parent_id} 的凭据已过期（{parent_to.isoformat()}），继承来的权限随之失效")
+    elif expires is None:
+        problems.append(f"{child}: 委派缺少可解析的到期时间")
+    elif expires > parent_to:
+        problems.append(
+            f"{child}: 委派到期 {expires.isoformat()} 晚于父凭据有效期 {parent_to.isoformat()}——子不得比父活得久"
+        )
+    return problems
+
+
+# ── V9 遏制沿委派链级联 ────────────────────────────────────────────────────────
+def rule_containment_cascades(
+    att: dict,
+    containment: list[dict] | None,
+    graph: list[dict] | None,
+    parents: dict[str, dict] | None,
+) -> RuleResult:
+    """V9：被遏制的 agent，它的下级不能还留着继承来的权限（ASAS-8.5）。
+
+    这条规则检查的是**台账层面**的性质，不是单份凭据的性质——"吊销有没有往下走"
+    要看整个委派图。所以它有两份输入：遏制记录 + 委派边。
+
+    **图完整不完整必须说清**：
+
+    * `graph` 给全了（控制面把台账摊开、或导出文件里带 `graph`）→ 某个被遏制的
+      agent 没有下级，就是"真的没有下级"，判 pass；
+    * `graph` 没给（只有手上这几份凭据）→ 看不见下级**不等于**没有下级。
+      这种情况下如果记录里有遏制对象，就如实报 not_evaluated。
+
+    这一条不是洁癖：把"我没看见"当成"不存在"，正是被遏制的 agent 还能继续跑的原因。
+    """
+    if containment is None:
+        return RuleResult("containmentCascades", NOT_EVALUATED, ["没有提供遏制记录，无法检查级联"])
+
+    from .graph import delegation_edges
+
+    complete = graph is not None
+    if graph is None:
+        sources = [(att, "self")] + [(p, "parent") for p in (parents or {}).values()]
+        graph = delegation_edges(sources)
+
+    org = str((att.get("subject") or {}).get("org") or "")
+    org_edges = [e for e in graph if e["org"] in (org, "")]
+    contained = {str(r.get("agent") or "") for r in containment}
+    problems: list[str] = []
+    unseen: list[str] = []
+    for agent in sorted(contained):
+        if not agent:
+            continue
+        children = [e for e in org_edges if e["parent"] == agent]
+        for edge in children:
+            if edge["child"] not in contained:
+                problems.append(
+                    f"{edge['child']}: 父 {agent} 已被遏制，但下级仍在（既不遏制也不放行——按 ASAS-8.5 视为未遏制）"
+                )
+        if not children and not complete:
+            unseen.append(agent)
+    if problems:
+        return RuleResult("containmentCascades", FAIL, problems)
+    if unseen:
+        return RuleResult(
+            "containmentCascades",
+            NOT_EVALUATED,
+            [f"{a}: 手上这份委派图不完整，无法确认它有没有下级（看不见 ≠ 没有）" for a in unseen],
+        )
+    return RuleResult("containmentCascades", PASS, [])
 
 
 # ── V3 未知必须声明 ────────────────────────────────────────────────────────────
@@ -252,18 +402,29 @@ def verify(
     *,
     files: dict[str, bytes] | None = None,
     events: list[dict] | None = None,
+    parents: dict[str, dict] | None = None,
+    containment: list[dict] | None = None,
+    graph: list[dict] | None = None,
     now: datetime | None = None,
 ) -> Report:
-    """验证一份 ASAS-A 凭据。三道输入都是独立可选的：
+    """验证一份 ASAS-A 凭据。五道输入都是独立可选的：
 
-    - ``files``  证据文件（不给则 V1 未评估）
-    - ``events`` 事件流（不给则 V6 未评估）
+    - ``files``       证据文件（不给则 V1 未评估）
+    - ``events``      事件流（不给则 V6 未评估）
+    - ``parents``     委派父凭据 ``{agent id: 凭据}``（不给则 V8 报"未知委派链"）
+    - ``containment`` 遏制记录（不给则 V9 未评估）
+    - ``graph``       委派边全集（不给则 V9 只能用手上这几份凭据拼一张残图，
+                      并且会如实说明"看不见 ≠ 没有"）
+
+    "不给"和"给了但是空的"是两件事：前者未评估，后者是"查过了，没有"。
     """
     moment = now or datetime.now(timezone.utc)
     return Report(
         [
             rule_hash_match(attestation, files),
             rule_narrowing_only(attestation, moment),
+            rule_delegation_narrows(attestation, parents, moment),
+            rule_containment_cascades(attestation, containment, graph, parents),
             rule_no_undeclared_unknown(attestation),
             rule_every_verdict_has_basis(attestation),
             rule_all_pinned_or_exempt(attestation, moment),

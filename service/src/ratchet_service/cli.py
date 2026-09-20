@@ -51,6 +51,14 @@ def main(argv: list[str] | None = None) -> int:
                         help="不出网取制品哈希（内网/无出网时用）；相关字段如实记为 unknown")
     p_asas.add_argument("--http-budget", type=float, default=0,
                         help="整趟出网的秒数预算（默认 60）；用完即停，剩下的记为 unknown")
+    p_asas.add_argument("--delegated-from", default="",
+                        help="父 agent id：本凭据的 agent 是替它干活的（ASAS-2.4/2.5）")
+    p_asas.add_argument("--delegation-expires", default="",
+                        help="委派到期时间（默认取本凭据有效期；不得晚于父凭据）")
+    p_asas.add_argument("--parent", action="append", default=[],
+                        help="父凭据文件（可重复）。不给而声明了委派 = 未知委派链 = 越权")
+    p_asas.add_argument("--containment", default="",
+                        help="遏制记录 JSON（控制面 GET /contain 的产物），用于 V9 级联检查")
     p_asas.add_argument("--exempt", action="append", default=[],
                         help="未定版组件的书面豁免：name=YYYY-MM-DD（可重复，ASAS-3.1）")
 
@@ -130,6 +138,10 @@ def _asas(args) -> int:
         if (directory / name).is_file()
     ]
 
+    # 遏制记录与委派图是一对输入：只看记录不知道谁是谁的下级，
+    # 只看图不知道谁被吊销了（见 asas.rule_containment_cascades）。
+    state = _load_containment(args.containment)
+    parents = _load_parents(args.parent)
     attestation, report = asas_build.build_and_verify(
         policy,
         org=args.org,
@@ -139,6 +151,10 @@ def _asas(args) -> int:
         evidence=evidence,
         exemptions=_parse_exemptions(args.exempt),
         artifact_hasher=artifacts.hash_npm_package,
+        delegation=_delegation_arg(args, parents),
+        parents=parents,
+        containment=state[0] if state else None,
+        graph=state[1] if state else None,
     )
     out = asas_build.write(attestation, directory / "attestation.json")
 
@@ -224,6 +240,59 @@ def _parse_exemptions(items) -> dict:
             raise SystemExit(f"错误：--exempt 需要 name=YYYY-MM-DD 形式，收到 {item!r}")
         out[name] = when
     return out
+
+
+def _delegation_arg(args, parents: dict[str, dict] | None) -> dict | None:
+    """把 --delegated-from / --parent 拼成构建参数。
+
+    父凭据在手时，把它的到期时间一并交给构建器，让默认委派到期取"两者的较早者"：
+    否则父子两份凭据相隔几秒生成，子就比父多活几秒，默认产物直接违规（实测踩过）。
+    """
+    if not args.delegated_from:
+        return None
+    parent = (parents or {}).get(args.delegated_from) or {}
+    bound = str((parent.get("subject") or {}).get("period", {}).get("to") or "")
+    return {
+        "from": args.delegated_from,
+        "expires": args.delegation_expires,
+        "parentNotAfter": bound,
+    }
+
+
+def _load_parents(paths) -> dict[str, dict] | None:
+    """读父凭据文件 → ``{agent id: 凭据}``。
+
+    一个文件里可能有好几个 agent，全部收进来：验证器按 `delegation.from` 去找。
+    没给就是 None（= "没有这份输入"），与"给了一份不含父的凭据"是两件事。
+    """
+    if not paths:
+        return None
+    parents: dict[str, dict] = {}
+    for path in paths:
+        att = json.loads(Path(path).read_text(encoding="utf-8"))
+        for agent in att.get("agents") or []:
+            if agent.get("id"):
+                parents[str(agent["id"])] = att
+    return parents
+
+
+def _load_containment(path: str) -> tuple[list[dict], list[dict] | None] | None:
+    """读遏制记录（控制面 GET /contain 的产物）→ ``(记录, 委派图或 None)``。
+
+    服务端返回 ``{"containment": [...], "graph": [...]}``。带 `graph` 的导出是真图，
+    V9 因此能判"确实没有下级"；只有记录而没有图时图会退化成残图，
+    V9 会如实报未评估（看不见 ≠ 没有）。裸数组也认，免得人手抄一份就报错。
+    """
+    if not path:
+        return None
+    payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    graph = None
+    if isinstance(payload, dict):
+        graph = payload.get("graph")
+        payload = payload.get("containment") or []
+    if not isinstance(payload, list):
+        raise SystemExit("错误：--containment 需要 {\"containment\": [...]} 或 [...]")
+    return payload, graph
 
 
 def _asas_diff(args) -> int:

@@ -76,6 +76,40 @@ if [ "$put_code" != "201" ]; then
 fi
 echo "   已入账：$(cat "$OUT/attest-response.json")"
 
+# 证据上传：控制面只有拿到**原始字节**才能自己重算哈希（V1 才不是"未评估"）。
+# 这一步只传凭据 manifest 里列过的文件，不把整个目录倒出去。
+echo "==> 上传证据文件（让控制面能自己重算哈希）"
+python3 - "$OUT" "$ASAS_API" <<'PY'
+import base64, json, os, sys, urllib.error, urllib.request
+
+out, api = sys.argv[1], sys.argv[2]
+delivery = os.path.join(out, "delivery")
+att = json.load(open(os.path.join(delivery, "attestation.json"), encoding="utf-8"))
+ident = json.load(open(os.path.join(out, "attest-response.json"), encoding="utf-8"))["id"]
+
+files = {}
+for item in (att.get("manifest") or {}).get("evidence") or []:
+    name = item.get("file") or ""
+    path = os.path.join(delivery, name)
+    if name and os.path.isfile(path):
+        files[name] = base64.b64encode(open(path, "rb").read()).decode()
+
+if not files:
+    # 没有证据可传不是失败：凭据里已经声明了它覆盖不到什么（ASAS-6.3）。
+    print("   没有可上传的证据文件（凭据里的 hashMatch 会保持未评估）")
+    raise SystemExit(0)
+
+body = json.dumps({"attestationId": ident, "files": files}).encode()
+req = urllib.request.Request(api + "/evidence", data=body,
+                             headers={"Content-Type": "application/json"}, method="POST")
+try:
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        print("   " + resp.read().decode())
+except urllib.error.HTTPError as exc:
+    print(f"❌ 证据上传失败（HTTP {exc.code}）：{exc.read().decode()[:200]}")
+    raise SystemExit(1)
+PY
+
 # 顺带把验证也跑一遍：控制面与本地必须一致，不一致就该立刻知道。
 echo "==> 控制面验证（与本地自查是同一份规则）"
 verify_code=$(curl -sS -o "$OUT/verify.json" -w '%{http_code}' \

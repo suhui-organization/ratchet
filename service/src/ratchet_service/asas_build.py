@@ -22,6 +22,59 @@ from . import asas
 DEFAULT_VALIDITY_DAYS = 30
 
 
+def _delegation_block(
+    delegation: dict | None, verdicts: list[dict], agent_id: str, period_to
+) -> dict:
+    """把"这个 agent 是替谁干活的"写进凭据（ASAS-2.4/2.5）。
+
+    作用域 = 它**实际**被授予的资产，不是调用方声称的一个列表：
+    要拿去和父比的是实际拿到的东西；声明一个比实际更小的集合，验证会通过，
+    但凭据就在撒谎——那正是这份标准要防的事。
+
+    没给到期时间时取 ``min(本凭据有效期, 父的到期)``。**父的到期必须参与**：
+    只取自己的有效期会让父子两份凭据相隔几秒生成时出现"子比父多活 3 秒"，
+    于是默认生成的委派就是违规的——本机实测踩过。默认值不该生产出失败。
+    """
+    if not delegation:
+        return {}
+    parent = str(delegation.get("from") or "").strip()
+    if not parent:
+        return {}
+    granted = sorted(
+        {
+            str(v.get("asset"))
+            for v in verdicts
+            if v.get("agent") == agent_id and v.get("decision") in ("allow", "approve") and v.get("asset")
+        }
+    )
+    if not granted:
+        # schema 要求 scope 至少一项。一个什么都没被授予的 agent 没有可继承的权限，
+        # 写一条空委派既不合 schema，也没有信息量——如实不写。
+        return {}
+    return {
+        "delegation": {
+            "from": parent,
+            "scope": granted,
+            "expires": str(delegation.get("expires") or _default_expiry(delegation, period_to)),
+        }
+    }
+
+
+def _default_expiry(delegation: dict, period_to) -> str:
+    """默认到期 = 自己有效期与父到期的较早者。"""
+    bound = delegation.get("parentNotAfter")
+    if bound:
+        try:
+            parent_to = datetime.fromisoformat(str(bound).replace("Z", "+00:00"))
+        except ValueError:
+            parent_to = None
+        if parent_to is not None:
+            if parent_to.tzinfo is None:
+                parent_to = parent_to.replace(tzinfo=timezone.utc)
+            return min(period_to, parent_to).isoformat()
+    return period_to.isoformat()
+
+
 def _hash_unknown_reason(ref: str, hasher_supplied: bool) -> str:
     """没算出资质哈希时，``unknown[].why`` 该怎么写。
 
@@ -83,11 +136,16 @@ def build_attestation(
     validity_days: int = DEFAULT_VALIDITY_DAYS,
     exemptions: dict | None = None,
     artifact_hasher=None,
+    delegation: dict | None = None,
 ) -> dict:
     """policy.json（+ 可选的 inventory / 证据文件）→ ASAS-A 凭据。
 
     ``inventory`` 是 ``ratchet scan --introspect --out`` 的产物；没有它时工具面就是未知，
     会被显式声明而不是猜。
+
+    ``delegation`` = ``{"from": 父 agent id, "expires": ISO 时间}``：这份凭据代表的
+    agent 是**替别人干活**的（ASAS-2.4/2.5）。作用域取它实际被授予的资产，
+    因为"我实际拿了什么"才是要拿去和父比的东西——写成"我声称我只拿了什么"没有意义。
     """
     moment = generated_at or datetime.now(timezone.utc)
     agent_id = str(policy.get("agent") or "agent")
@@ -220,6 +278,7 @@ def build_attestation(
             "registered": True,
             "runtime": {"kind": runtime_kind or agent_id, "version": str(policy.get("generator") or "unknown")},
             "identity": {"type": "unknown", "shared": False},
+            **_delegation_block(delegation, verdicts, agent_id, period_to),
         }],
         "assets": assets,
         "verdicts": verdicts,
@@ -236,12 +295,22 @@ def build_attestation(
 
 
 def build_and_verify(policy: dict, **kwargs) -> tuple[dict, asas.Report]:
-    """产出凭据并**立刻用同一套规则自查**——自己产的凭据先过自己的校验，不过就不算交付。"""
+    """产出凭据并**立刻用同一套规则自查**——自己产的凭据先过自己的校验，不过就不算交付。
+
+    `parents` / `containment` / `graph` 是**验证输入**（不参与构建），所以在这里摘出来：
+    它们决定了自查能评到几条规则，不该被塞进 build_attestation 的参数里。
+    """
+    parents = kwargs.pop("parents", None)
+    containment = kwargs.pop("containment", None)
+    graph = kwargs.pop("graph", None)
     attestation = build_attestation(policy, **kwargs)
     evidence = kwargs.get("evidence") or []
     report = asas.verify(
         attestation,
         files={name: data for name, data in evidence} or None,
+        parents=parents,
+        containment=containment,
+        graph=graph,
     )
     return attestation, report
 

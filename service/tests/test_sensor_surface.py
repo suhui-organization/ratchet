@@ -93,6 +93,19 @@ def test_sensor_judges_by_http_status_not_by_pipeline_exit_code():
     assert re.search(r"422\)[\s\S]{0,300}exit 1", text)
 
 
+def test_sensor_uploads_only_the_evidence_the_manifest_lists():
+    """上传证据是为了让控制面能自己重算哈希（V1 不再是"未评估"）。
+
+    只传 manifest 里列过的文件：整个交付目录倒出去，等于把"凭据声明覆盖了什么"
+    和"实际给了什么"变成两件事——那正是这份标准要防的。
+    """
+    text = SENSOR_SH.read_text(encoding="utf-8")
+    assert "/evidence" in text
+    assert "manifest" in text and 'item.get("file")' in text
+    # 上传失败必须非 0 退出：静默丢证据 = 控制面永远算不了哈希，而没人知道为什么。
+    assert re.search(r"except urllib\.error\.HTTPError[\s\S]{0,200}SystemExit\(1\)", text)
+
+
 requires_helm = pytest.mark.skipif(shutil.which("helm") is None, reason="本机没有 helm")
 
 

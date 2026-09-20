@@ -41,7 +41,7 @@
 | **P1** | 控制面骨架上本地 k8s | `asas-api` + `asas-verify` + postgres 三个 Deployment | `kubectl -n asas get deploy` 全 Ready；`POST /attestations` 存取一份凭据；`POST /verify` 返回六条规则结果 |
 | **P2** ✅ | 传感器容器化 | `asas-sensor` sidecar，默认不执行 | 见 §8（digest 固定运行、只读挂载、默认不出网也不执行） |
 | **P3** | CI 门禁 | GitHub Action + SARIF + 非 0 退出码 | 未定版新增会让 PR 变红；SARIF 能在 Security 标签页显示 |
-| **P4** | 委派边界与遏制 | 委派链校验 + 吊销编排 | 子 agent 放大权限被拒；"哪些 agent 曾触达 X"能查到 |
+| **P4** ✅ | 委派边界与遏制 | 跨凭据委派校验 + 吊销编排 + 证据上传 | 见 §9（放大权限被拒并点名资产；触达查询带依据；控制面能自己重算哈希） |
 
 **每阶段的"完成"定义**：spec 更新 + 实现 + 测试全绿 + **本地 k8s 部署验证** + DELIVERY 记录。
 
@@ -99,7 +99,8 @@ helm upgrade --install asas deploy/k8s/helm/asas -n asas \
 | 本地 k8s 控制面（P1） | ✅ 部署在 kind `ns=asas`，`/verify` 与本地逐字一致 |
 | 传感器容器化（P2） | ✅ 见 §8 |
 | CI 门禁（P3，提前做掉） | ✅ `.github/workflows/asas-gate.yml` |
-| 委派边界与遏制（P4） | ⏳ 下一轮 |
+| 委派边界与遏制（P4） | ✅ 见 §9 |
+| **待定**：这件事还差一步才算"能卖" | `spec/` 的两条新规则需要外部评审；评审稿见 [ASAS-SPEC-for-review.md](ASAS-SPEC-for-review.md) |
 
 ## 8. P2 的任务分解与结论（已完成）
 
@@ -122,3 +123,22 @@ helm upgrade --install asas deploy/k8s/helm/asas -n asas \
    Pod 照样报 Completed。判断必须看 HTTP 状态码。
 3. `--set` 用逗号分隔赋值：`sensor.exempt="a=1,b=2"` 会被截断成一条豁免 + 一堆垃圾顶层键。
    现在渲染期直接报错（`templates/values-guard.yaml`）。
+
+## 9. P4 的任务分解与结论（已完成）
+
+| # | 任务 | 状态 | 判据 / 证据 |
+|---|---|---|---|
+| T16 | 委派边界：子不得放大父的权限 | ✅ | V8 `delegationNarrows`：作用域 ⊆、deny 只增不减、子不得比父活得久；**父凭据不可得 = 未知委派链 = 越权**。真机：`worker-1: 委派放大 ['secrets']` → 控制面 422 |
+| T17 | 遏制编排：吊销 + 溯源 | ✅ | `/contain` 级联（记 `via`）、`--dry-run` 预演、`ratchet contain`、`ratchet reach --subject X`（授权面 / 观测面 / 拒绝 / 遏制 / 委派链 / 依据） |
+| T18 | 证据上传，让控制面能重算哈希 | ✅ | `POST /evidence`；传感器自动上传；真机：`hashMatch` 由"未评估"变 **pass**，9 条规则 8 条已评估（只剩事件流） |
+| T19 | 落档 | ✅ | [DELIVERY-0.17.0.md](DELIVERY-0.17.0.md) |
+
+**这一轮学到的三件事**（都写成了用例）：
+
+1. **台账主键只用"组织+日期"会互相覆盖**——父与子两份凭据只留下一份，
+   "谁能触达 X"当场少一半答案。现在主键含内容哈希：同一份凭据重复上报仍然幂等，
+   不同主体各占一行。
+2. **V2 曾把跨文档委派判成"未知委派链"**：那会把合法架构判违规，还让 V8 永远轮不到。
+   分工写清楚了——V2 只管文档内，V8 管跨凭据，拿不到父凭据才是越权。
+3. **默认值不许生产出失败**：父子两份凭据相隔几秒生成时，默认委派到期会比父晚几秒，
+   于是一份默认生成的凭据直接违规。现在默认取"自己有效期与父到期的较早者"。

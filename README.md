@@ -82,6 +82,8 @@ python3 verify.py ./delivery
 | `ratchet policy draft` / `check` | 编译三态策略（每条带判定依据），并试跑一次假设调用 |
 | `ratchet deliver` / `report build` | 一条命令出交付目录：策略 + 报告 + sha256 清单 |
 | `ratchet mcp` | 以 stdio MCP server 形态跑（`ratchet_scan` / `ratchet_policy` / `ratchet_check`） |
+| `ratchet reach --api <控制面> --subject <资产>` | 问台账"谁曾能触达 X"（ASAS-8.3）：授权面与观测面分开列，每条带依据；**台账没覆盖就直说"答不了"** |
+| `ratchet contain --api <控制面> --agent <id> [--yes]` | 吊销一个 agent，默认**级联到它的下级**（ASAS-8.5）；**默认只预告不动手**，看清单再加 `--yes` |
 | `ratchet feedback` | 把去标识化结果整理成 issue 正文供你复制；**没有遥测，不会自动发** |
 
 拿到它的方式：`curl -fsSL https://github.com/suhui-organization/ratchet/releases/latest/download/install.sh | sh`、

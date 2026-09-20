@@ -95,10 +95,18 @@ def test_v2_expired_delegation_fails():
     assert run(att)["narrowingOnly"].status == asas.FAIL
 
 
-def test_v2_unknown_delegation_chain_fails():
+def test_v2_leaves_cross_document_delegations_to_v8():
+    """父不在同一份凭据里时，V2 **不判**——跨凭据的收窄是 V8 的活。
+
+    V2 只看文档内部不等于它放弃了这条：一份声称委派给"ghost"的凭据，会在 V8 那里
+    因为拿不到 ghost 的凭据而失败（ASAS-2.5）。两条规则各管一段，不重叠。
+    """
     att = _with_child(["read_file"], source="ghost")
-    result = run(att)["narrowingOnly"]
-    assert result.status == asas.FAIL and "未知委派链" in result.details[0]
+    assert run(att)["narrowingOnly"].status == asas.PASS
+    report = asas.verify(att, containment=[], now=NOW)
+    rules = {r.rule: r for r in report.results}
+    assert rules["delegationNarrows"].status == asas.FAIL
+    assert "未知委派链" in rules["delegationNarrows"].details[0]
 
 
 # ── V3 未知必须声明（3 条）────────────────────────────────────────────────────
@@ -194,7 +202,15 @@ def test_report_ok_means_no_failures():
 
 
 def test_report_lists_evaluated_rules():
-    report = asas.verify(base_attestation(), files={"policy.json": b"policy"}, events=_events(), now=NOW)
+    # 五道输入全给齐（含遏制记录）才谈得上"没有未评估的规则"。
+    # 少了遏制记录这一份输入，V9 报未评估是**正确行为**，不是失败。
+    report = asas.verify(
+        base_attestation(),
+        files={"policy.json": b"policy"},
+        events=_events(),
+        containment=[],
+        now=NOW,
+    )
     assert report.ok is True
     assert report.not_evaluated == []
 
