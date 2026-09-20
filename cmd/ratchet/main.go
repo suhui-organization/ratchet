@@ -271,7 +271,9 @@ func cmdDeliver(args []string) int {
 		fmt.Printf("  分享包      %s\n", res.Bundle)
 		fmt.Printf("  收货方验证  python3 verify.py %s\n", res.Delivery)
 	} else {
-		fmt.Printf("\n  策略与清单已写出；报告那一步没跑成，按上面的提示手工执行即可。\n")
+		fmt.Printf("\n  策略与清单已写出（policy.json 有效）。报告那一步需要 Python 侧的工具：\n")
+		fmt.Printf("    在仓库里执行  pip install -e service\n")
+		fmt.Printf("  或者用 --report-cmd 指定你自己的调用方式，然后重跑本命令。\n")
 	}
 	return 0
 }

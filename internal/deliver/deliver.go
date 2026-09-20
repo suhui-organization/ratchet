@@ -135,8 +135,14 @@ func Run(opts Options) (Result, error) {
 	if err := cmd.Run(); err != nil {
 		res.Steps = append(res.Steps, Step{
 			Name: "report", OK: false,
-			Note: fmt.Sprintf("could not run %q — policy and inventory are still here; run the report step yourself",
-				strings.Join(args, " ")),
+			// 这条提示必须**可执行**。原先是把失败的命令原样打回去让人照抄，
+			// 但那条命令只有在 ratchet-report 已安装时才跑得通——缺工具的人照着抄
+			// 只会再撞一次墙（实测：直接执行 cli.py 会因相对导入报 ImportError）。
+			// 所以这里改成告诉他"缺什么、怎么装、或者怎么自己指定"。
+			Note: fmt.Sprintf("report step skipped: %q is not runnable (%v). policy.json and inventory are still valid. "+
+				"To generate the report: install the Python side (in a checkout: `pip install -e service`) "+
+				"or pass your own command with --report-cmd.",
+				strings.Join(opts.ReportCmd, " "), err),
 		})
 		res.Delivery = ""
 		return res, nil // 前三步的产物有效，不当作整体失败

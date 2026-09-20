@@ -50,14 +50,25 @@ tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT INT TERM
 
 fetch() {
-  if command -v curl >/dev/null 2>&1; then curl -fsSL --max-time 120 "$1" -o "$2"
-  elif command -v wget >/dev/null 2>&1; then wget -q -T 120 -O "$2" "$1"
+  # 这台机器（以及很多国内到 GitHub 的链路）会在大约 100 秒处把连接掐掉——
+  # 实测：第一次装就在 950KB/1.5MB 处超时失败，重跑一次就过。
+  # 所以下载必须自己重试，否则用户（尤其是替用户干活的 agent）会在第一步
+  # 就拿到一个失败，然后去排查一个根本不存在的"地址不可达"问题。
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL --http1.1 --retry 5 --retry-delay 3 --retry-all-errors \
+      --connect-timeout 15 --max-time 300 --continue-at - "$1" -o "$2"
+  elif command -v wget >/dev/null 2>&1; then
+    wget -q --tries=5 --waitretry=3 --timeout=30 -c -O "$2" "$1"
   else die "需要 curl 或 wget"
   fi
 }
 
 say "下载 $BASE_URL/$asset"
-fetch "$BASE_URL/$asset" "$tmp/$asset" || die "下载失败：$BASE_URL/$asset（确认这个地址能访问）"
+fetch "$BASE_URL/$asset" "$tmp/$asset" || die "下载失败：$BASE_URL/$asset
+
+  这多半不是地址的问题，而是到 GitHub 的网络抖动（连接被中途掐断）。
+  先原样重跑一次本命令——脚本已经带重试，多数情况下第二次就过了。
+  连续失败再检查网络或代理设置。"
 
 # ── 3. 校验（fail-closed）──────────────────────────────────────────────────
 if command -v sha256sum >/dev/null 2>&1; then
