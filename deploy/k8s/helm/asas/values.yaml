@@ -1,0 +1,29 @@
+# ASAS 控制面默认值。单租户、无外部依赖。
+image:
+  repositoryPrefix: ""
+  pullSecrets: []
+  api:
+    repository: asas-api
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+
+api:
+  replicaCount: 1
+  # sqlite 落 PVC，不能被两个 Pod 同时写 → Recreate（与 Fluvia/PodCloud 同一教训）
+  strategy: Recreate
+  port: 8080
+  serviceType: ClusterIP
+  nodePort: 0
+  nodeSelector: {}
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  persistence:
+    enabled: true
+    size: 1Gi
+    storageClass: ""     # 空 = 集群默认
+    existingClaim: ""

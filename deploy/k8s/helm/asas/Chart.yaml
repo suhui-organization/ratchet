@@ -1,0 +1,6 @@
+apiVersion: v2
+name: asas
+description: ASAS 控制面（台账 / 验证 / 遏制记录）——单租户 v1
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

@@ -1,0 +1,12 @@
+# 本地集群（192.168.66.8，ns=asas）收敛值。单一事实源：镜像 tag 只写在这里。
+image:
+  repositoryPrefix: swr.ap-southeast-3.myhuaweicloud.com/digital-finance
+  pullSecrets:
+    - name: ratchet-swr        # 复用同一个 SWR 组织的拉取密钥
+  api:
+    tag: "0.1.0-bootstrap"
+
+api:
+  replicaCount: 1
+  serviceType: NodePort
+  nodePort: 30100
