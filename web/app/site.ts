@@ -8,7 +8,7 @@
 
 export const site = {
   name: 'Ratchet',
-  version: '0.12.1',
+  version: '0.12.2',
   tagline: {
     eyebrow: 'Developer preview',
     title: 'Privileges are compiled, not hand-written.',
@@ -32,7 +32,7 @@ export const site = {
    * 文件名带版本号，所以发新版时这里要跟着改（和上面 installUrl 同一批产物）。
    */
   desktopBundleUrl:
-    'https://github.com/suhui-organization/ratchet/releases/latest/download/ratchet-0.12.1.mcpb',
+    'https://github.com/suhui-organization/ratchet/releases/latest/download/ratchet-0.12.2.mcpb',
   /** 无下载地址时的联系入口。 */
   contactUrl: 'mailto:iverson.wuwei@gmail.com?subject=Ratchet%20access',
   /** 页面上显示的联系邮箱（必须与 contactUrl 指向同一个信箱）。 */
