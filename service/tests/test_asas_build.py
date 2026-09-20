@@ -96,6 +96,29 @@ def test_expired_exemption_is_not_compliant():
     assert pinned_rule.status == asas.FAIL, "过期的豁免必须失效，否则'豁免'就成了永久赦免"
 
 
+def test_artifact_hash_fills_content_hash_when_available():
+    """拿到制品时：contentHash 写进去、unknown 不再声明它，版本用解析到的真值。"""
+    facts = [{"name": "filesystem", "ref": "filesystem-mcp@latest", "pinned": False}]
+    att = asas_build.build_attestation(
+        POLICY, org="acme", inventory=facts,
+        artifact_hasher=lambda ref: ("1.2.3", "sha256:" + "a" * 64),
+    )
+    filesystem = next(a for a in att["assets"] if a["name"] == "filesystem")
+    assert filesystem["contentHash"] == "sha256:" + "a" * 64
+    assert filesystem["version"] == "1.2.3"
+    declared = " ".join(u["what"] for u in att["unknown"])
+    assert "filesystem: contentHash" not in declared
+
+
+def test_default_does_not_touch_the_network():
+    """库的默认行为必须离线：没有显式传 hasher 时，contentHash 只能是 None + 声明。"""
+    facts = [{"name": "filesystem", "ref": "filesystem-mcp@1.2.3", "pinned": True}]
+    att = asas_build.build_attestation(POLICY, org="acme", inventory=facts)
+    filesystem = next(a for a in att["assets"] if a["name"] == "filesystem")
+    assert filesystem["contentHash"] is None
+    assert any(u["what"] == "filesystem: contentHash" for u in att["unknown"])
+
+
 def test_self_check_passes_on_generated_attestation():
     att, report = asas_build.build_and_verify(POLICY, org="acme")
     assert report.ok is True, [r.as_dict() for r in report.results]

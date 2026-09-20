@@ -65,6 +65,7 @@ def build_attestation(
     generated_at: datetime | None = None,
     validity_days: int = DEFAULT_VALIDITY_DAYS,
     exemptions: dict | None = None,
+    artifact_hasher=None,
 ) -> dict:
     """policy.json（+ 可选的 inventory / 证据文件）→ ASAS-A 凭据。
 
@@ -98,8 +99,21 @@ def build_attestation(
     unknown: list[dict] = []
     assets: list[dict] = []
     exemptions = exemptions or {}
+    # artifact_hasher 默认是 None = **不联网**。取制品哈希要出网，因此必须由调用方
+    # 显式开启（CLI 会传真实的 hash_npm_package）——库的默认行为不该偷偷发请求，
+    # 否则单元测试会变成网络测试，离线环境也无法使用。
     for server in sorted(tools_by_server):
         tools = sorted(tools_by_server[server])
+        # 制品哈希：能算就算（ASAS-3.2）；算不出来就如实声明，不填假值。
+        ref = str(facts.get(server, {}).get("ref") or "")
+        resolved_version, content_hash = None, None
+        content_unknown = "本机扫描拿不到制品本体，无法计算产物哈希（不填假值）"
+        if ref:
+            got = artifact_hasher(ref) if artifact_hasher else None
+            if got:
+                resolved_version, content_hash = got
+            else:
+                content_unknown = f"取不到 {ref} 的制品（离线或包不存在），未计算哈希"
         # 描述哈希取自我们真正看到的东西：该 server 下工具名与依据的规范文本。
         # 它不是产物哈希——产物哈希需要制品本体，本机扫描拿不到。
         descriptor = json.dumps(
@@ -113,20 +127,22 @@ def build_attestation(
                 "name": server,
                 # 定版状态与版本引用是**配置里看得到的事实**，能拿到就必须写进来，
                 # 不能一律退化成 unknown——那会浪费这份凭据的信息量。
-                "version": (facts.get(server, {}).get("ref") or None),
+                # 优先写**解析到的真实版本**（比配置里写的引用更有信息量）；
+                # 拿不到时退回被声明的引用，再拿不到才是 null。
+                "version": resolved_version or (facts.get(server, {}).get("ref") or None),
                 "pinned": facts.get(server, {}).get("pinned"),
                 # 书面豁免写进凭据本身（ASAS-3.1）
                 **({"exemptUntil": exemptions[server]} if server in exemptions else {}),
-                "contentHash": None,
+                "contentHash": content_hash,
                 "descHash": _sha256_text(descriptor),
                 "reachableTools": reachable.get(server),
             }
         )
         unknown.append({
             "what": f"{server}: contentHash",
-            "why": "本机扫描拿不到制品本体，无法计算产物哈希（不填假值）",
+            "why": content_unknown,
             "discoveredAt": moment.isoformat(),
-        })
+        }) if content_hash is None else None
         if facts.get(server, {}).get("pinned") is None:
             unknown.append({
                 "what": f"{server}: pinned",

@@ -92,6 +92,7 @@ def main(argv: list[str] | None = None) -> int:
 def _asas(args) -> int:
     """产出 ASAS-A 凭据并自查。返回非 0 = 凭据不通过验证，不该交给收货方。"""
     from . import asas, asas_build
+    from .artifacts import hash_npm_package
 
     directory = Path(args.dir)
     directory.mkdir(parents=True, exist_ok=True)
@@ -114,6 +115,7 @@ def _asas(args) -> int:
         inventory=inventory,
         evidence=evidence,
         exemptions=_parse_exemptions(args.exempt),
+        artifact_hasher=hash_npm_package,
     )
     out = asas_build.write(attestation, directory / "attestation.json")
 
