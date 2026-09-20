@@ -434,3 +434,21 @@ Claude Desktop 用户下载即装——**不需要 Smithery 做中间人**，还
 - X：回复 @gaetanobyarobi（"AI agents now have a software supply chain: skill…"）——用本机实测数字回应（16 server / 12 未锁 / 164 工具），不带链接、不提产品名。
 - 搜索轮换关键词：MCP|agent × supply chain|unpinned|least privilege|tool poisoning（英文、排除回复、取最新）。
 - 本轮跳过：@Tank23x0（SecurityWeek 融资新闻）、@cv_usk（企业嵌入决策点，偏理论）、@MasterAlpha27（代币项目）。
+
+### 养号进度 / 点对点回复（2026-09-20 第二轮）
+
+**HN：本轮 2 条，达到每日上限**
+
+1. `item?id=49745351`（MCPJam 评测平台的讨论）：讲评测面的盲区——16 server / 12 未锁 / 164 工具 / 15 条不该手工批准；并指出「4 个服务器根本枚举不出来」和「描述与行为偏离是客户端唯一可见的信号」。
+2. `item?id=49745809`（Plugin4Shell 零点击 RCE）：回 gdor80 关于 marketplace 固定 SHA 被自动升级击穿的观点，指出 MCP 侧的同类问题是**默认状态**而不是攻击（12/16 未锁），并补两条事实：pin 住产物与决定它能碰什么是两件事；4/16 枚举不出来意味着任何清单都静默不完整。
+
+**X：本轮 1 条**
+
+- 回复 @llm_redteam（原帖：LocalAI MCP STDIO，这就是那个 bug）：stdio 没有可配置的鉴权边界，边界就是这个进程能碰到什么；附本机实测数字。
+- 踩坑记录：两版草稿分别 290 / 282 字符，**按钮静默变灰**（只有 `isEnabled()` 看得出来，不报错）；缩到 268 字符发出。
+
+**Reddit：只能填、不能提交（本轮定论）**
+
+- 在 CrowdStrike 工具描述攻击那条（`1wj3zmp`）下，1079 字正文经 `ax.setValue` **成功填进评论框**；
+- 但提交按钮在 shadow DOM 里：Playwright 点击超时、AX 树不暴露该按钮、Ctrl+Enter 的元素序号会失效；
+- 结论：这个渠道目前走不通，不再浪费轮次；等平台改版，或找到能穿透 shadow DOM 的点击方式再回来。
