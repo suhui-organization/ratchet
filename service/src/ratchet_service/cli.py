@@ -36,6 +36,17 @@ def main(argv: list[str] | None = None) -> int:
     p_bundle.add_argument("--dir", required=True, help="交付目录")
     p_bundle.add_argument("--out", required=True, help="输出的 .json 路径")
 
+    # ASAS-A 凭据：产出并**当场自查**。自查不过就返回非 0——自己产的凭据先过自己的校验，
+    # 不过就不算交付（见 docs/DEVELOPMENT-PLAN.md 的 P0/T2）。
+    p_asas = sub.add_parser("asas", help="产出 ASAS-A 凭据并立即验证")
+    p_asas.add_argument("--policy", required=True, help="策略 JSON（policy draft 的产物）")
+    p_asas.add_argument("--dir", required=True, help="交付目录（凭据写到 <dir>/attestation.json）")
+    p_asas.add_argument("--org", required=True, help="凭据主体：组织名")
+    p_asas.add_argument("--environment", default="", help="环境名（可选）")
+    p_asas.add_argument("--owner", default="unassigned", help="agent 的具名责任人")
+    p_asas.add_argument("--inventory", default="", help="scan --introspect 的产物（给了才知道工具面）")
+    p_asas.add_argument("--json", action="store_true", help="以 JSON 打印验证报告")
+
     args = parser.parse_args(argv)
 
     if args.cmd == "build":
@@ -70,7 +81,49 @@ def main(argv: list[str] | None = None) -> int:
         print("  收货方打开验证页，把这个文件拖进去即可——不需要账号、不需要装东西。")
         return 0
 
+    if args.cmd == "asas":
+        return _asas(args)
+
     return 2
+
+
+def _asas(args) -> int:
+    """产出 ASAS-A 凭据并自查。返回非 0 = 凭据不通过验证，不该交给收货方。"""
+    from . import asas, asas_build
+
+    directory = Path(args.dir)
+    directory.mkdir(parents=True, exist_ok=True)
+    policy = json.loads(Path(args.policy).read_text(encoding="utf-8"))
+    inventory = json.loads(Path(args.inventory).read_text(encoding="utf-8")) if args.inventory else None
+
+    # 证据只取"凭据所描述的那些文件"，显式列举而不是遍历目录——
+    # 否则 attestation.json 会把自己算进自己的证据里，形成自指。
+    evidence = [
+        (name, (directory / name).read_bytes())
+        for name in ("policy.json", "report.md")
+        if (directory / name).is_file()
+    ]
+
+    attestation, report = asas_build.build_and_verify(
+        policy,
+        org=args.org,
+        environment=args.environment or None,
+        owner=args.owner,
+        inventory=inventory,
+        evidence=evidence,
+    )
+    out = asas_build.write(attestation, directory / "attestation.json")
+
+    if args.json:
+        print(json.dumps(report.as_dict(), ensure_ascii=False, indent=2))
+    else:
+        print(f"ASAS-A 凭据：{out}")
+        print(f"  已评估规则 {len(report.evaluated)} 条 · 未评估 {len(report.not_evaluated)} 条")
+        for result in report.results:
+            mark = {"pass": "✅", "fail": "❌", "not_evaluated": "—"}[result.status]
+            print(f"  {mark} {result.rule}" + (f"  {result.details[0]}" if result.details else ""))
+        print(f"  unknown 声明 {len(attestation['unknown'])} 条（拿不到的事实，不填假值）")
+    return 0 if report.ok else 1
 
 
 def build_delivery(

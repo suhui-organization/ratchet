@@ -149,7 +149,45 @@ func Run(opts Options) (Result, error) {
 	}
 	res.Steps = append(res.Steps, Step{Name: "report", OK: true, Note: delivery})
 	res.Delivery, res.Bundle = delivery, bundle
+
+	// ⑤ ASAS-A 凭据：产出后**当场用同一套规则自查**。
+	// 自查不过就不算交付（见 docs/DEVELOPMENT-PLAN.md 的 P0/T2）——自己产的凭据先过
+	// 自己的校验，否则收货方拿到的就是一份连签发方都没验过的东西。
+	// 判定逻辑不在这里重复实现：Go 负责产出，Python 负责验证，规则只有一份。
+	org := opts.Client
+	if org == "" {
+		org = "local"
+	}
+	owner := os.Getenv("USER")
+	if owner == "" {
+		owner = "unassigned"
+	}
+	attArgs := append([]string{}, opts.ReportCmd...)
+	attArgs = append(attArgs, "asas",
+		"--policy", policyPath, "--dir", delivery, "--org", org, "--owner", owner)
+	if inv := filepath.Join(opts.OutDir, "inventory.json"); fileExists(inv) {
+		attArgs = append(attArgs, "--inventory", inv)
+	}
+	attCmd := exec.Command(attArgs[0], attArgs[1:]...)
+	attCmd.Stdout, attCmd.Stderr = os.Stdout, os.Stderr
+	if err := attCmd.Run(); err != nil {
+		res.Steps = append(res.Steps, Step{
+			Name: "attest", OK: false,
+			Note: "ASAS-A 凭据未通过自查，交付不算完成（见上面的规则输出）",
+		})
+		return res, nil
+	}
+	res.Steps = append(res.Steps, Step{
+		Name: "attest", OK: true,
+		Note: filepath.Join(delivery, "attestation.json") + "（已通过 ASAS-V 自查）",
+	})
 	return res, nil
+}
+
+// fileExists 只用于"可选输入是否存在"这类判断，不吞掉真实错误。
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
 }
 
 // inventoryFrom 把扫描结果降级成清单。
