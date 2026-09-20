@@ -106,20 +106,34 @@
         "properties": {
           "kind": { "enum": ["server", "skill", "plugin", "tool"] },
           "name": { "type": "string", "minLength": 1 },
-          "version": { "type": "string" },
-          "pinned": { "type": "boolean", "description": "ASAS-3.1. false requires exemptUntil." },
+          "version": {
+            "type": ["string", "null"],
+            "description": "null = version not determined, which MUST appear in unknown[] (same rule as contentHash / pinned)."
+          },
+          "pinned": {
+            "type": ["boolean", "null"],
+            "description": "ASAS-3.1. false requires exemptUntil. null means 'not determined' and MUST appear in unknown[] - a producer that cannot tell whether something is pinned must say so rather than guess."
+          },
           "exemptUntil": {
             "type": "string",
             "format": "date-time",
             "description": "ASAS-3.1. A written exemption with an expiry date. Open-ended exemptions are not conformant."
           },
-          "contentHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+          "contentHash": {
+            "type": ["string", "null"],
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "description": "ASAS-3.2. null is allowed and means 'not determined' - it then MUST appear in unknown[]. Forging a hash is worse than admitting you could not compute one. (Amended 2026-09-20 while writing the reference builder: the original draft required a hash for every asset, which would have forced producers to invent one.)"
+          },
           "descHash": {
             "type": "string",
             "pattern": "^sha256:[0-9a-f]{64}$",
             "description": "ASAS-3.3. Hash of the tool description + schema. Tracked separately from contentHash so description-level tampering is visible even when the artifact is unchanged."
           },
-          "reachableTools": { "type": "integer", "minimum": 0 }
+          "reachableTools": {
+            "type": ["integer", "null"],
+            "minimum": 0,
+            "description": "null = tool surface not enumerated (e.g. --introspect not run, or the server failed to answer). MUST appear in unknown[]."
+          }
         },
         "allOf": [
           {

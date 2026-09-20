@@ -158,6 +158,14 @@ def rule_no_undeclared_unknown(att: dict) -> RuleResult:
                 problems.append(f"{name}: 工具面未枚举，但未在 unknown[] 声明")
             if not asset.get("descHash") and name not in declared:
                 problems.append(f"{name}: 缺少描述哈希（描述状态未知），但未在 unknown[] 声明")
+        # contentHash 允许为 null，但"没算出哈希"同样是未知，必须声明（ASAS-3.2 + 3.5）
+        if not asset.get("contentHash") and name not in declared:
+            problems.append(f"{name}: 没有内容哈希（无法确定产物状态），但未在 unknown[] 声明")
+        # pinned 允许为 null，但"不知道是否定版"必须声明，否则等于默认声称已定版
+        if not isinstance(asset.get("pinned"), bool) and name not in declared:
+            problems.append(f"{name}: 定版状态未知，但未在 unknown[] 声明")
+        if not asset.get("version") and name not in declared:
+            problems.append(f"{name}: 版本未知，但未在 unknown[] 声明")
     return RuleResult("noUndeclaredUnknown", FAIL if problems else PASS, problems)
 
 
@@ -177,7 +185,12 @@ def rule_every_verdict_has_basis(att: dict) -> RuleResult:
 def rule_all_pinned_or_exempt(att: dict, now: datetime) -> RuleResult:
     problems: list[str] = []
     for asset in att.get("assets") or []:
-        if asset.get("pinned"):
+        pinned = asset.get("pinned")
+        if pinned is True:
+            continue
+        if pinned is None:
+            # "不知道是否定版"由 V3 负责（必须在 unknown[] 里声明）；
+            # 这里只处理**已知未定版**，那种情况必须有未过期的书面豁免。
             continue
         name = asset.get("name")
         exempt_until = _parse_ts(asset.get("exemptUntil") or "")

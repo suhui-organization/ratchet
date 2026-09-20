@@ -197,3 +197,18 @@ def test_report_lists_evaluated_rules():
     report = asas.verify(base_attestation(), files={"policy.json": b"policy"}, events=_events(), now=NOW)
     assert report.ok is True
     assert report.not_evaluated == []
+
+
+# ── V3 新增分支：哈希与定版状态未知时必须声明 ────────────────────────────────
+def test_v3_missing_content_hash_must_be_declared():
+    att = base_attestation()
+    att["assets"][0]["contentHash"] = None
+    assert run(att)["noUndeclaredUnknown"].status == asas.FAIL
+    att["unknown"] = [{"what": "filesystem", "why": "拿不到制品", "discoveredAt": NOW.isoformat()}]
+    assert run(att)["noUndeclaredUnknown"].status == asas.PASS
+
+
+def test_v3_unknown_pinned_state_must_be_declared():
+    att = base_attestation()
+    att["assets"][0]["pinned"] = None
+    assert run(att)["noUndeclaredUnknown"].status == asas.FAIL
