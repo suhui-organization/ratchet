@@ -9,7 +9,8 @@ COPY service/src/ratchet_service /app/ratchet_service
 
 ENV PYTHONPATH=/app \
     ASAS_DB=/data/asas.db \
-    ASAS_PORT=8080
+    ASAS_PORT=8080 \
+    ASAS_VERSION=dev
 
 RUN useradd -u 10001 -m asas && mkdir -p /data && chown -R asas:asas /data /app
 USER asas

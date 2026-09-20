@@ -10,7 +10,9 @@
    单租户、无并发写、表结构就是"一行一份凭据"，迁移路径清晰。
 
 端点：
+    GET  /                     控制台（随镜像发布的单页，无构建步骤、无 CDN）
     GET  /healthz              探针
+    GET  /ledger               台账快照：凭据 + 每份的九条规则结果 + 断流 + 遏制
     POST /attestations         存一份凭据
     GET  /attestations         列表
     GET  /attestations/<id>    取全文
@@ -38,10 +40,15 @@ import threading
 import urllib.parse
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 
 from . import asas, containment
 
 DB_PATH = os.environ.get("ASAS_DB", "/data/asas.db")
+# 控制台要显示"这是哪一版"。镜像 tag 由 Helm 注入（见 templates/api.yaml），
+# 拿不到就写 dev——**不猜一个版本号**，那是这个项目最不能撒的谎。
+VERSION = os.environ.get("ASAS_VERSION", "dev")
+CONSOLE_HTML = Path(__file__).resolve().parent / "console" / "console.html"
 
 _lock = threading.Lock()
 
@@ -391,6 +398,87 @@ def silence_state() -> dict:
     }
 
 
+# ── 首页 ──────────────────────────────────────────────────────────────────────
+def ledger_snapshot() -> dict:
+    """控制台的一次性数据源：台账 + 每份凭据的判定 + 断流 + 遏制。
+
+    为什么要专门一个只读端点，而不是让界面自己拼：
+
+    * 界面**不许重新实现验证规则**（那是这个项目的第 1 条原则），所以每份凭据的
+      九条规则结果必须由这里算——用的是 `asas.verify`，和 `/verify`、CLI 同一份实现；
+    * 一次请求拿齐，避免界面发 N 个请求再自己合并（合并逻辑就是第二份实现）。
+
+    代价写在明处：凭据多了这里会变慢。台账是单租户小数据，这一版接受。
+    """
+    pairs = stored_pairs()
+    containment_records = list_containment()
+    graph = containment.graph_of(pairs)
+    credentials = []
+    for att, ident in pairs:
+        report = asas.verify(
+            att,
+            files=load_evidence(ident),
+            events=load_events(ident),
+            parents=resolve_parents(att, pairs),
+            containment=containment_records,
+            graph=graph,
+        )
+        credentials.append(
+            {
+                "id": ident,
+                "org": str((att.get("subject") or {}).get("org") or ""),
+                "agents": [str(a.get("id") or "") for a in att.get("agents") or []],
+                "generatedAt": str((att.get("manifest") or {}).get("generatedAt") or ""),
+                "storedAt": None,
+                "assets": [str(a.get("name") or "") for a in att.get("assets") or []],
+                "hasEvents": bool(load_events(ident)),
+                "evidence": [
+                    str(i.get("file") or "") for i in (att.get("manifest") or {}).get("evidence") or []
+                ],
+                "report": report.as_dict(),
+            }
+        )
+    stored_at = {row["id"]: row["storedAt"] for row in list_attestations()}
+    for credential in credentials:
+        credential["storedAt"] = stored_at.get(credential["id"])
+    silence = silence_state()
+    return {
+        "version": VERSION,
+        "counts": {
+            "credentials": len(credentials),
+            "chains": len(silence["heads"]),
+            "breaks": len(silence["breaks"]),
+            "containment": len(containment_records),
+        },
+        "credentials": credentials,
+        "breaks": silence["breaks"],
+        "heads": silence["heads"],
+        "containment": containment_records,
+        "graph": graph,
+    }
+
+
+def render_index() -> str:
+    """控制台页面本身。
+
+    为什么要它有：这是个人会打开的地址。之前没有 `/` 路由，浏览器一开就是
+    `{"error": "not found"}`——看着像服务坏了，实际只是没路由。
+    "看起来坏了"和"真的坏了"在运维眼里是一回事。
+
+    单文件、无构建步骤、不引任何外部资源：控制面跑在没有外网的内网里，
+    一个 CDN 链接就等于一页白屏。
+    """
+    try:
+        return CONSOLE_HTML.read_text(encoding="utf-8")
+    except OSError:
+        # 页面丢了不该让整个服务看起来是坏的：给一句能照着查的话。
+        return (
+            "<!doctype html><meta charset=utf-8><title>ASAS 控制面</title>"
+            "<p>控制台页面文件不在镜像里（console/console.html）。"
+            "接口仍然可用，见 <a href=/healthz>/healthz</a> 与 <a href=/ledger>/ledger</a>。</p>"
+        )
+
+
 def resolve_parents(att: dict, pairs: list[tuple[dict, str]] | None = None) -> dict[str, dict]:
     """给一份凭据找它的委派父凭据（同组织、agent 名相同）。
 
@@ -428,6 +516,14 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _send_html(self, code: int, html: str) -> None:
+        body = html.encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def _body(self) -> dict:
         length = int(self.headers.get("Content-Length") or 0)
         if not length:
@@ -435,6 +531,13 @@ class Handler(BaseHTTPRequestHandler):
         return json.loads(self.rfile.read(length).decode())
 
     def do_GET(self):  # noqa: N802 (stdlib 约定)
+        if self.path in ("/", "/index.html"):
+            # 人会用浏览器打开这个地址。"没有路由"和"服务坏了"看起来是一回事，
+            # 所以这里给一页端点清单，而不是 {"error":"not found"}。
+            return self._send_html(200, render_index())
+        if self.path == "/ledger":
+            # 控制台一次拿齐的数据源（判定由后端算，界面不重写规则）。
+            return self._send(200, ledger_snapshot())
         if self.path == "/healthz":
             self._send(200, {"status": "ok"})
         elif self.path.startswith("/reach"):

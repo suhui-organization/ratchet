@@ -85,6 +85,75 @@ def test_healthz(api):
     assert call(api, "/healthz") == (200, {"status": "ok"})
 
 
+def test_index_page_is_html_not_a_404(api):
+    """浏览器打开根路径要看到端点清单。
+
+    真实反馈：之前没有 `/` 路由，打开就是 `{"error": "not found"}`——
+    用户以为服务坏了。在这个位置，**看起来坏了就是坏了**。
+    """
+    import urllib.request
+
+    with urllib.request.urlopen(api + "/") as resp:
+        assert resp.status == 200
+        assert resp.headers["Content-Type"].startswith("text/html")
+        html = resp.read().decode()
+    for expected in ("Ratchet 控制面", "/verify", "/silence", "/reach", "没有任何认证"):
+        assert expected in html, f"首页缺了 {expected}"
+    # 内网可用：页面不许引任何外部资源（一个 CDN 链接 = 一页白屏）
+    assert "//cdn" not in html and "https://" not in html
+
+
+def test_index_shows_live_counts(api):
+    import urllib.request
+
+    call(api, "/attestations", attestation("a1"))
+    html = urllib.request.urlopen(api + "/").read().decode()
+    # 计数现在来自 /ledger（页面自己渲染），所以这里查的是数据源而不是页面里的字面量
+    ledger = json.loads(urllib.request.urlopen(api + "/ledger").read())
+    assert ledger["counts"]["credentials"] == 1
+    assert "id=\"c-cred\"" in html
+
+
+def test_ledger_gives_the_console_everything_in_one_call(api):
+    """控制台的数据源：凭据 + 每份的九条规则 + 断流 + 遏制。
+
+    为什么必须是后端算好：界面**不许重新实现验证规则**（项目第 1 条原则）。
+    所以这里断言的就是"后端把判定算出来了"，而不是"界面能算"。
+    """
+    att = attestation("a1")
+    ident = call(api, "/attestations", att)[1]["id"]
+    status, ledger = call(api, "/ledger")
+    assert status == 200
+    assert ledger["counts"] == {"credentials": 1, "chains": 0, "breaks": 0, "containment": 0}
+    entry = ledger["credentials"][0]
+    assert entry["id"] == ident
+    assert entry["agents"] == ["a1"]
+    assert entry["assets"] == ["filesystem"]
+    rules = {r["rule"] for r in entry["report"]["results"]}
+    assert "silenceIsAuditable" in rules and "allPinnedOrExempt" in rules
+    # 没上传证据/事件时，规则如实报"未评估"，不是通过
+    assert entry["report"]["notEvaluated"] == ["hashMatch", "silenceIsAuditable"] or set(
+        entry["report"]["notEvaluated"]
+    ) >= {"hashMatch", "silenceIsAuditable"}
+
+
+def test_ledger_reports_isolation_of_each_credential(api):
+    """两份凭据互不干扰：各自的规则结果按各自的输入算（这是台账最容易写错的地方）。"""
+    first = attestation("a1")
+    ident = call(api, "/attestations", first)[1]["id"]
+    policy_bytes = json.dumps({"agent": "a1", "servers": {}}, sort_keys=True).encode()
+    call(api, "/evidence", {"attestationId": ident,
+                            "files": {"policy.json": base64.b64encode(policy_bytes).decode()}})
+    second = attestation("a2")
+    another = call(api, "/attestations", second)[1]["id"]
+    assert another.startswith("acme-") and another != ident
+
+    ledger = call(api, "/ledger")[1]
+    by_id = {c["id"]: c for c in ledger["credentials"]}
+    assert "hashMatch" not in by_id[ident]["report"]["notEvaluated"], "传了证据的那份应当能重算哈希"
+    assert "hashMatch" in by_id[another]["report"]["notEvaluated"], "没传证据的那份不该跟着变"
+
+
 def test_attestation_roundtrip(api):
     att = attestation("a1")
     status, stored = call(api, "/attestations", att)

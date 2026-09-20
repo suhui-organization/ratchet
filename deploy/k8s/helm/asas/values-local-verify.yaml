@@ -14,7 +14,7 @@ sensor:
   hostScanPath: /var/asas-scan
   scanHome: /scan
   image:
-    tag: "0.1.0-p5"
+    tag: "0.1.0-p7"
     # 固定 digest：同一个 tag 可以被推成另一个镜像，digest 不会。
     digest: "sha256:dcff9ad154d59e639910d97734ff9e0a3e7cca3f780025b5f25d11bea02ea652"
   # 宿主机家目录属于 uid 1000，容器用同一个身份才读得到。

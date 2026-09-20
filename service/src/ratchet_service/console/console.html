@@ -1,0 +1,515 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Ratchet 控制面</title>
+<!-- 图标内联成 data URI：仍是单文件、不发额外请求。
+     之前没有它，浏览器请求 /favicon.ico 拿到 404，控制台每次都报一条错——
+     "看起来坏了"和"真的坏了"在这个位置是一回事。 -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%234d6bfe'/%3E%3Cpath d='M8 22v-6h4v-4h4V8h8' fill='none' stroke='%23fff' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<!--
+  控制台。三条约束决定了它的形态：
+  1. 随镜像发布：单文件、无构建步骤、不引任何外部资源（内网没有外网）。
+  2. 不重新实现任何判定：九条规则的结果一律来自后端（/ledger、/verify），
+     这里只负责把依据摆到人眼前。
+  3. 控制面没有认证：这件事必须在页面上写得比任何数字都显眼。
+-->
+<style>
+  :root {
+    --ink:#202124; --muted:#8691a1; --faint:#6b7280; --line:#e5e7eb;
+    --brand:#4d6bfe; --brand-ink:#234792; --surface:#fff; --surface-2:#f7f8fa;
+    --code:#121c31;
+    --pass:#12704f; --fail:#b23c17; --warn-bg:#fff7ef; --warn-line:#eccfae; --warn-ink:#8a4b12;
+    --radius:6px; --mono:"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans:ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC",
+           "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  }
+  * { box-sizing:border-box }
+  html { color-scheme:light; -webkit-text-size-adjust:100% }
+  body {
+    margin:0; background:var(--surface); color:var(--ink);
+    font:15px/1.6 var(--sans); -webkit-font-smoothing:antialiased;
+  }
+  /* 浏览器表面也属于这套设计：选中、光标、滚动条、焦点环、数字对齐。 */
+  ::selection { background:color-mix(in srgb, var(--brand) 20%, transparent) }
+  input, button, a { caret-color:var(--brand) }
+  * { scrollbar-width:thin; scrollbar-color:#d8dce3 transparent }
+  *::-webkit-scrollbar { width:10px; height:10px }
+  *::-webkit-scrollbar-thumb {
+    background:#d8dce3; border:3px solid transparent; background-clip:content-box; border-radius:99px;
+  }
+  :focus-visible { outline:2px solid var(--brand); outline-offset:2px; border-radius:4px }
+  a { color:var(--brand-ink); text-underline-offset:.25em }
+  .tnum { font-variant-numeric:tabular-nums }
+  .mono { font-family:var(--mono); font-size:.86em }
+  .wrap { max-width:78rem; margin:0 auto; padding:0 1.25rem 4rem }
+  header { border-bottom:1px solid var(--line); padding:1.1rem 0 .9rem }
+  .head-row { display:flex; flex-wrap:wrap; gap:.75rem 1.25rem; align-items:baseline;
+              justify-content:space-between }
+  h1 { font-size:1.05rem; font-weight:650; margin:0; letter-spacing:-.01em }
+  h1 .v { color:var(--faint); font-family:var(--mono); font-size:.78rem; margin-left:.5rem }
+  .readout { display:flex; gap:1.1rem; color:var(--faint); font-size:.82rem }
+  .readout b { color:var(--ink); font-weight:600 }
+  .dot { width:7px; height:7px; border-radius:50%; background:var(--pass); display:inline-block;
+         margin-right:.4rem; vertical-align:1px }
+  .dot.bad { background:var(--fail) }
+  .alert { display:flex; gap:.6rem; align-items:flex-start; margin:1rem 0 0; padding:.7rem .85rem;
+           border:1px solid var(--warn-line); background:var(--warn-bg); color:var(--warn-ink);
+           border-radius:var(--radius); font-size:.86rem }
+  .alert svg { flex:0 0 auto; margin-top:.15rem }
+  .alert b { color:#6d3a0c }
+  .query { margin:1.6rem 0 0 }
+  .query label { display:block; font-size:.8rem; color:var(--faint); margin-bottom:.4rem }
+  .field { display:flex; gap:.5rem; flex-wrap:wrap }
+  .field input {
+    flex:1 1 22rem; min-width:0; font:inherit; font-size:1.05rem; padding:.6rem .7rem;
+    border:1px solid var(--line); border-radius:var(--radius); background:var(--surface);
+  }
+  .field input:hover { border-color:#cfd4dc }
+  /* 主按钮用 --brand-ink 而不是 --brand：#4d6bfe 上压白字只有 4.33:1（实测，
+     检测器也报了），达不到 4.5:1。#234792 是 8.79:1，仍是同一个蓝色的深档。
+     品牌色继续用在焦点环与链接上——那里不需要 4.5:1 的正文对比度。 */
+  button {
+    font:inherit; font-size:.9rem; padding:.6rem 1rem; border-radius:var(--radius);
+    border:1px solid var(--brand-ink); background:var(--brand-ink); color:#fff; cursor:pointer;
+  }
+  button:hover { background:#1b366f; border-color:#1b366f }
+  button.ghost { background:transparent; color:var(--ink); border-color:var(--line) }
+  button.ghost:hover { background:var(--surface-2); border-color:#cfd4dc }
+  button:disabled { opacity:.5; cursor:not-allowed }
+  .chips { display:flex; flex-wrap:wrap; gap:.35rem; margin-top:.6rem; align-items:center }
+  .chips .lbl { color:var(--faint); font-size:.8rem; margin-right:.15rem }
+  .chip { font-family:var(--mono); font-size:.78rem; padding:.2rem .5rem; border:1px solid var(--line);
+          border-radius:99px; background:var(--surface-2); color:var(--ink); cursor:pointer }
+  .chip:hover { border-color:var(--brand); color:var(--brand-ink) }
+  .grid { display:grid; grid-template-columns:minmax(0,1.55fr) minmax(0,1fr); gap:1.75rem;
+          margin-top:1.75rem; align-items:start }
+  @media (max-width:60rem) { .grid { grid-template-columns:1fr } }
+  h2 { font-size:.82rem; font-weight:600; color:var(--faint); margin:0 0 .5rem }
+  section + section { margin-top:1.5rem }
+  .rule { border:1px solid var(--line); border-radius:var(--radius); overflow:hidden }
+  .row { display:flex; gap:.7rem; align-items:flex-start; width:100%; text-align:left;
+         padding:.6rem .75rem; background:var(--surface); border:0; border-top:1px solid var(--line);
+         color:inherit; font:inherit; cursor:pointer }
+  .row:first-child { border-top:0 }
+  .row:hover { background:var(--surface-2) }
+  .row[aria-current="true"] { background:color-mix(in srgb, var(--brand) 7%, var(--surface)) }
+  .row .who { font-family:var(--mono); font-size:.86rem; min-width:9.5rem }
+  .row .what { flex:1 1 auto; min-width:0 }
+  .row .why { color:var(--faint); font-size:.84rem; display:block; overflow-wrap:anywhere }
+  .row .via { color:var(--faint); font-size:.8rem; margin-top:.15rem }
+  .verdict { font-size:.76rem; padding:.05rem .4rem; border-radius:99px; border:1px solid var(--line);
+             color:var(--faint); white-space:nowrap }
+  .verdict.allow { color:var(--pass); border-color:#bfe0d2 }
+  .verdict.deny { color:var(--fail); border-color:#eecbb9 }
+  .verdict.contained { color:var(--fail); border-color:#eecbb9; background:#fdf4ef }
+  .empty { border:1px dashed var(--line); border-radius:var(--radius); padding:1rem .9rem;
+           color:var(--faint); font-size:.88rem }
+  .empty code { display:block; margin:.5rem 0 0; padding:.5rem .6rem; background:var(--code);
+                color:#e8ecf5; border-radius:4px; font-family:var(--mono); font-size:.78rem;
+                overflow-x:auto; white-space:pre }
+  .notice { border:1px solid var(--warn-line); background:var(--warn-bg); color:var(--warn-ink);
+            border-radius:var(--radius); padding:.6rem .75rem; font-size:.86rem }
+  .card { border:1px solid var(--line); border-radius:var(--radius); padding:.85rem .9rem }
+  .card .id { font-family:var(--mono); font-size:.82rem; overflow-wrap:anywhere }
+  .meta { display:grid; grid-template-columns:auto 1fr; gap:.15rem .7rem; margin:.6rem 0 .9rem;
+          font-size:.83rem }
+  .meta dt { color:var(--faint) }
+  .meta dd { margin:0; overflow-wrap:anywhere }
+  ul.rules { list-style:none; margin:0; padding:0 }
+  ul.rules li { display:flex; gap:.5rem; align-items:flex-start; padding:.35rem 0;
+                border-top:1px solid var(--line); font-size:.85rem }
+  ul.rules li:first-child { border-top:0 }
+  ul.rules .name { font-family:var(--mono); font-size:.8rem; min-width:12.5rem }
+  ul.rules .det { color:var(--faint); overflow-wrap:anywhere }
+  .actions { display:flex; gap:.5rem; flex-wrap:wrap; margin-top:.9rem }
+  .cascade { margin-top:.75rem; font-size:.85rem }
+  .cascade ol { margin:.35rem 0 0; padding-left:1.2rem }
+  .cascade code { font-family:var(--mono); font-size:.78rem; background:var(--surface-2);
+                  padding:.15rem .35rem; border-radius:3px; display:inline-block; margin-top:.4rem }
+  .breaks li { margin-bottom:.7rem }
+  .breaks .cause { color:var(--fail) }
+  details.endpoints { margin-top:2rem; border-top:1px solid var(--line); padding-top:.9rem }
+  details.endpoints summary { cursor:pointer; color:var(--faint); font-size:.85rem }
+  details.endpoints table { border-collapse:collapse; margin-top:.75rem; font-size:.83rem; width:100% }
+  details.endpoints td { border-top:1px solid var(--line); padding:.35rem .5rem; vertical-align:top }
+  details.endpoints td.m { font-family:var(--mono); color:var(--faint); width:4rem }
+  footer { color:var(--faint); font-size:.82rem; margin-top:1.5rem }
+  .sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap }
+  .status-line { color:var(--faint); font-size:.82rem; margin-top:.5rem; min-height:1.2em }
+  .status-line.err { color:var(--fail) }
+  @media (prefers-reduced-motion:no-preference) {
+    @keyframes rise { from { opacity:.001; transform:translateY(6px) } to { opacity:1; transform:none } }
+    .anim { animation:rise .28s cubic-bezier(.16,1,.3,1) both; animation-delay:calc(var(--i,0) * 40ms) }
+  }
+  /* 窄屏：把"谁 / 凭什么"从并排改成一上一下。
+     390px 下并排只剩约 150px 给依据，读不了——这不是美观问题，是信息读不到。 */
+  @media (max-width:34rem) {
+    .row { flex-direction:column; gap:.2rem }
+    .row .who { min-width:0 }
+    ul.rules li { flex-wrap:wrap; gap:.35rem }
+    ul.rules .name { min-width:0 }
+    .readout { gap:.75rem 1rem }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="head-row">
+      <h1>Ratchet 控制面<span class="v mono" id="version">…</span></h1>
+      <div class="readout tnum" aria-live="polite">
+        <span><span class="dot" id="health-dot"></span><span id="health">连接中</span></span>
+        <span>凭据 <b id="c-cred">–</b></span>
+        <span>事件链 <b id="c-chain">–</b></span>
+        <span>断流 <b id="c-break">–</b></span>
+        <span>遏制 <b id="c-contain">–</b></span>
+      </div>
+    </div>
+    <div class="alert">
+      <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="none"
+           stroke="currentColor" stroke-width="1.4" stroke-linejoin="round">
+        <path d="M8 1.6 15 14H1z"/>
+        <path d="M8 6v4.2" stroke-linecap="round"/>
+        <circle cx="8" cy="12.2" r=".8" fill="currentColor" stroke="none"/>
+      </svg>
+      <div><b>这份服务没有任何认证。</b>能连上它就能读全部台账、伪造凭据、触发遏制。
+      只在本机或内网使用，不要暴露到公网。</div>
+    </div>
+  </header>
+
+  <div class="query">
+    <label for="subject">谁曾能碰过 —— 输入资产名（某个 MCP server 或工具）</label>
+    <div class="field">
+      <input id="subject" type="search" autocomplete="off" spellcheck="false"
+             placeholder="例如 chrome-devtools，回车查询">
+      <button id="go">查询</button>
+    </div>
+    <div class="chips" id="chips"></div>
+    <p class="status-line" id="status">台账里出现过的资产会列在上面；按 / 可直接聚焦输入框。</p>
+  </div>
+
+  <div class="grid">
+    <div>
+      <section>
+        <h2>触达答案</h2>
+        <div id="answer"><div class="empty">还没有查询。输入一个资产名，或点上面的资产标签。</div></div>
+      </section>
+      <section id="breaks-section" hidden>
+        <h2>断流记录（事件链被改写或截断）</h2>
+        <div class="rule"><ul class="rules breaks" id="breaks"></ul></div>
+      </section>
+    </div>
+
+    <div>
+      <section>
+        <h2>依据：这份结论来自哪份凭据</h2>
+        <div id="evidence">
+          <div class="empty">点左边任何一条结果，这里会显示它的来源凭据，以及九条规则当时是怎么判的。</div>
+        </div>
+      </section>
+      <section>
+        <h2>台账</h2>
+        <div id="ledger"></div>
+      </section>
+    </div>
+  </div>
+
+  <details class="endpoints">
+    <summary>接口清单（这个页面用的就是它们，没有别的秘密）</summary>
+    <table>
+      <tr><td class="m">GET</td><td><a href="/ledger">/ledger</a></td><td>台账快照：凭据 + 每份的九条规则 + 断流 + 遏制</td></tr>
+      <tr><td class="m">GET</td><td><a href="/reach?subject=filesystem">/reach?subject=X</a></td><td>谁曾能触达 X</td></tr>
+      <tr><td class="m">GET</td><td><a href="/silence">/silence</a></td><td>事件链摘要与断流记录</td></tr>
+      <tr><td class="m">GET</td><td><a href="/contain">/contain</a></td><td>遏制记录与完整委派图</td></tr>
+      <tr><td class="m">POST</td><td>/verify</td><td>跑 ASAS-V（与 CLI 同一份实现）</td></tr>
+      <tr><td class="m">POST</td><td>/evidence · /events</td><td>上传证据文件 / 事件流</td></tr>
+      <tr><td class="m">POST</td><td>/contain</td><td>记一次遏制；dryRun:true 只预告</td></tr>
+      <tr><td class="m">GET</td><td><a href="/healthz">/healthz</a></td><td>探活</td></tr>
+    </table>
+  </details>
+
+  <footer>判定由控制面后端执行，页面不重算任何规则。从头验一遍的步骤见
+  <span class="mono">docs/VERIFY-LOCAL.md</span>。</footer>
+</div>
+
+<script>
+// 状态点阵用自绘 SVG：通过／不通过／未评估三个形状不同（不是只靠颜色区分）。
+const GLYPH = {
+  pass: '<svg width="11" height="11" viewBox="0 0 11 11" aria-hidden="true"><circle cx="5.5" cy="5.5" r="4" fill="var(--pass)"/></svg>',
+  fail: '<svg width="11" height="11" viewBox="0 0 11 11" aria-hidden="true" fill="none" stroke="var(--fail)" stroke-width="1.5"><circle cx="5.5" cy="5.5" r="4"/><path d="M2.7 8.3 8.3 2.7" stroke-linecap="round"/></svg>',
+  not_evaluated: '<svg width="11" height="11" viewBox="0 0 11 11" aria-hidden="true" stroke="var(--faint)" stroke-width="1.5"><path d="M2.2 5.5h6.6" stroke-linecap="round"/></svg>'
+};
+const LABEL = { pass: '通过', fail: '不通过', not_evaluated: '未评估' };
+const VERDICT = { allow: '能', approve: '待批准', deny: '被拒' };
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s === null || s === undefined ? '' : s)
+  .replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+let state = { ledger: null, answer: null, subject: '', selected: null, busy: false };
+
+function api(path, options) {
+  return fetch(path, options).then(async (r) => {
+    const text = await r.text();
+    let body;
+    try { body = JSON.parse(text); } catch (e) { body = { error: text.slice(0, 200) }; }
+    if (!r.ok) throw new Error(body.error || ('HTTP ' + r.status));
+    return body;
+  });
+}
+
+function say(message, isError) {
+  const el = $('status');
+  el.textContent = message;
+  el.classList.toggle('err', !!isError);
+}
+
+async function loadLedger() {
+  const ledger = await api('/ledger');
+  state.ledger = ledger;
+  $('version').textContent = ledger.version;
+  $('c-cred').textContent = ledger.counts.credentials;
+  $('c-chain').textContent = ledger.counts.chains;
+  $('c-break').textContent = ledger.counts.breaks;
+  $('c-contain').textContent = ledger.counts.containment;
+  $('health').textContent = '在跑';
+  $('health-dot').classList.remove('bad');
+  renderChips();
+  renderLedger();
+  renderBreaks();
+}
+
+function renderChips() {
+  const credentials = (state.ledger && state.ledger.credentials) || [];
+  const assets = Array.from(new Set(credentials.flatMap((c) => c.assets || []))).filter(Boolean).sort();
+  const box = $('chips');
+  if (!assets.length) {
+    box.innerHTML = '<span class="lbl">台账里还没有资产——先产出一份凭据（见右下方台账区的命令）。</span>';
+    return;
+  }
+  box.innerHTML = '<span class="lbl">台账里出现过的资产：</span>' +
+    assets.slice(0, 14).map((a) => '<button class="chip" data-asset="' + esc(a) + '">' + esc(a) + '</button>').join('');
+  box.querySelectorAll('[data-asset]').forEach((b) => b.addEventListener('click', () => {
+    $('subject').value = b.dataset.asset;
+    query(b.dataset.asset);
+  }));
+}
+
+function renderLedger() {
+  const credentials = (state.ledger && state.ledger.credentials) || [];
+  if (!credentials.length) {
+    $('ledger').innerHTML =
+      '<div class="empty">台账是空的。两条命令产出一份凭据：' +
+      '<code>ratchet deliver --out /tmp/v --home "$HOME" --report-cmd "python3 -m ratchet_service.cli"</code>' +
+      '<code>curl -sS -X POST $ASAS_API/attestations -H "Content-Type: application/json" \\\n' +
+      '  --data-binary @/tmp/v/delivery/attestation.json</code>' +
+      '或者让传感器跑一趟：<code>kubectl -n asas create job --from=cronjob/asas-sensor x</code></div>';
+    return;
+  }
+  const rows = credentials.map((c, i) => {
+    const failed = (c.report.results || []).filter((r) => r.status === 'fail').length;
+    const mark = failed
+      ? '<span class="verdict deny">不通过 ' + failed + '</span>'
+      : '<span class="verdict allow">通过</span>';
+    return '<button class="row anim" style="--i:' + i + '" data-cred="' + esc(c.id) + '" ' +
+      'aria-current="' + (state.selected === c.id) + '">' +
+      '<span class="who">' + esc((c.agents || []).join(', ') || '—') + '</span>' +
+      '<span class="what"><span class="mono">' + esc(c.id) + '</span> ' + mark +
+      '<span class="why">' + esc(c.org) + ' · ' + (c.assets || []).length + ' 个资产 · ' +
+      (c.hasEvents ? '有事件流' : '无事件流') + '</span></span></button>';
+  }).join('');
+  $('ledger').innerHTML = '<div class="rule">' + rows + '</div>';
+  $('ledger').querySelectorAll('[data-cred]').forEach((b) =>
+    b.addEventListener('click', () => select(b.dataset.cred)));
+}
+
+function renderBreaks() {
+  const breaks = (state.ledger && state.ledger.breaks) || [];
+  $('breaks-section').hidden = !breaks.length;
+  if (!breaks.length) return;
+  $('breaks').innerHTML = breaks.map((b) =>
+    '<li><span>' + GLYPH.fail + '</span><span class="name">' + esc(b.agent) + '</span>' +
+    '<span class="det"><span class="cause">' + esc(b.reason) + '</span>' +
+    '<div class="via mono">上次到 seq ' + b.expectedSeq + '（' + esc(String(b.expectedHead).slice(0, 12)) +
+    '…） → 这次到 seq ' + b.actualSeq + '（' + esc(String(b.actualHead).slice(0, 12)) + '…）' +
+    ' · 检出 ' + esc(b.detectedAt) + '</div></span></li>').join('');
+}
+
+async function query(subject) {
+  subject = (subject || '').trim();
+  if (!subject) { say('先给一个资产名。', true); $('subject').focus(); return; }
+  state.subject = subject;
+  state.busy = true;
+  $('go').disabled = true;
+  say('查询 ' + subject + ' …');
+  $('answer').innerHTML = '<div class="rule"><div class="empty">查询中…</div></div>';
+  try {
+    state.answer = await api('/reach?subject=' + encodeURIComponent(subject));
+    renderAnswer();
+    const n = state.answer.granted.length;
+    say(n ? ('能碰 ' + subject + ' 的有 ' + n + ' 条授权记录；点任一条看依据。')
+          : ('台账里没有关于 ' + subject + ' 的授权记录。'));
+  } catch (err) {
+    $('answer').innerHTML = '<div class="empty">查询失败：' + esc(err.message) +
+      '<br>控制面还活着吗？试试 <span class="mono">curl $ASAS_API/healthz</span></div>';
+    say('查询失败：' + err.message, true);
+  } finally {
+    state.busy = false;
+    $('go').disabled = false;
+  }
+}
+
+function group(title, list, render) {
+  if (!list || !list.length) return '';
+  return '<section><h2>' + title + '（' + list.length + '）</h2><div class="rule">' +
+    list.map(render).join('') + '</div></section>';
+}
+
+function row(item, index) {
+  const chain = (item.chain || []).map((l) => l.parent + ' → ' + l.child).join('，');
+  const contained = item.contained || item.verdict === 'contained';
+  const label = item.verdict === 'approve' ? '待批准' : (VERDICT[item.verdict] || '');
+  const tone = item.verdict === 'deny' || contained ? 'deny' : (label ? 'allow' : '');
+  return '<button class="row anim" style="--i:' + index + '" data-cred="' + esc(item.attestationId || '') + '">' +
+    '<span class="who">' + esc(item.agent) + '</span>' +
+    '<span class="what">' + (item.org ? '<span class="mono">' + esc(item.org) + '</span> ' : '') +
+    (label ? '<span class="verdict ' + tone + '">' + label + '</span> ' : '') +
+    (contained ? '<span class="verdict contained">已遏制</span> ' : '') +
+    '<span class="why">' + esc(item.basis || '（没有写依据）') + '</span>' +
+    (chain ? '<span class="via">委派链：' + esc(chain) + '</span>' : '') +
+    (item.via ? '<span class="via">来自 ' + esc(item.via) + '</span>' : '') +
+    (item.attestationId ? '<span class="via mono">依据 ' + esc(item.attestationId) + '</span>' : '') +
+    '</span></button>';
+}
+
+function renderAnswer() {
+  const a = state.answer;
+  if (!a) return;
+  const parts = [];
+  if ((a.unanswerable || []).length) {
+    parts.push('<div class="notice" style="margin-bottom:1rem">' +
+      a.unanswerable.map(esc).join('<br>') + '</div>');
+  }
+  parts.push(group('能（授权面）', a.granted, (g, i) => row(g, i)));
+  const observed = (a.observed || []).map((o) => ({
+    agent: o.tool, org: o.org, basis: o.count + ' 次调用', verdict: '',
+    attestationId: o.attestationId, contained: (a.contained || []).indexOf(o.tool) >= 0
+  }));
+  parts.push(group('确实用过（观测面）', observed, (o, i) => row(o, i)));
+  parts.push(group('明确拒绝', a.denied, (d, i) => row(d, i)));
+  const contained = (a.contained || []).map((agent, i) => ({
+    agent: agent, org: '', basis: '已被吊销', verdict: 'contained',
+    attestationId: ((a.granted || []).find((g) => g.agent === agent) || {}).attestationId || ''
+  }));
+  parts.push(group('已遏制', contained, (c, i) => row(c, i)));
+  $('answer').innerHTML = parts.filter(Boolean).join('') || '<div class="empty">没有任何记录。</div>';
+  $('answer').querySelectorAll('[data-cred]').forEach((b) => {
+    if (b.dataset.cred) b.addEventListener('click', () => select(b.dataset.cred));
+  });
+}
+
+function select(id) {
+  if (!id) return;
+  state.selected = id;
+  renderLedger();
+  renderAnswer();
+  const found = ((state.ledger && state.ledger.credentials) || []).find((x) => x.id === id);
+  if (!found) {
+    $('evidence').innerHTML = '<div class="empty">这份凭据不在台账里（可能已被替换）。' +
+      '<br>重新跑一趟采集，再点它的依据。</div>';
+    return;
+  }
+  renderEvidence(found);
+}
+
+function renderEvidence(c) {
+  const results = c.report.results || [];
+  const failed = results.filter((r) => r.status === 'fail').length;
+  const rules = results.map((r) =>
+    '<li><span>' + (GLYPH[r.status] || GLYPH.not_evaluated) + '</span>' +
+    '<span class="name">' + esc(r.rule) + '</span>' +
+    '<span class="det">' + esc((r.details || []).slice(0, 2).join('；') || LABEL[r.status]) + '</span></li>').join('');
+  const silence = results.find((r) => r.rule === 'silenceIsAuditable');
+  $('evidence').innerHTML =
+    '<div class="card"><div class="id">' + esc(c.id) + '</div>' +
+    '<dl class="meta">' +
+      '<dt>组织</dt><dd>' + esc(c.org || '—') + '</dd>' +
+      '<dt>agent</dt><dd class="mono">' + esc((c.agents || []).join(', ') || '—') + '</dd>' +
+      '<dt>生成</dt><dd class="tnum mono">' + esc(c.generatedAt || '—') + '</dd>' +
+      '<dt>入账</dt><dd class="tnum mono">' + esc(c.storedAt || '—') + '</dd>' +
+      '<dt>证据</dt><dd class="mono">' + esc((c.evidence || []).join(' · ') || '（未上传）') + '</dd>' +
+      '<dt>事件流</dt><dd>' + (c.hasEvents ? '有' : '没有上传') +
+        (silence ? '（这条规则：' + LABEL[silence.status] + '）' : '') + '</dd>' +
+    '</dl>' +
+    '<h2>九条规则' + (failed ? '（' + failed + ' 条不通过）' : '') + '</h2>' +
+    '<ul class="rules">' + rules + '</ul>' +
+    '<div class="actions">' +
+      '<button class="ghost" data-act="verify">重新验证这份凭据</button>' +
+      '<button class="ghost" data-act="preview">遏制预演（只看会连累谁）</button>' +
+    '</div><div id="act-out"></div></div>';
+  $('evidence').querySelector('[data-act="verify"]').addEventListener('click', () => verifyAgain(c));
+  $('evidence').querySelector('[data-act="preview"]').addEventListener('click', () => previewContain(c));
+}
+
+async function verifyAgain(c) {
+  const out = $('act-out');
+  out.innerHTML = '<p class="status-line">重新验证中…</p>';
+  try {
+    const att = await api('/attestations/' + encodeURIComponent(c.id));
+    const report = await api('/verify', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(att)
+    });
+    const same = JSON.stringify(report.results) === JSON.stringify(c.report.results);
+    out.innerHTML = '<p class="status-line">' + (same
+      ? '与上面这份完全一致——同一份规则、同一份输入。'
+      : '结果与上面不同：输入变了（新证据 / 新事件 / 新遏制记录）。上面是入账时的快照，这里是最新一次。') +
+      '</p>';
+  } catch (err) {
+    out.innerHTML = '<p class="status-line err">' + esc(err.message) + '</p>';
+  }
+}
+
+async function previewContain(c) {
+  const out = $('act-out');
+  const agent = (c.agents || [])[0];
+  if (!agent) { out.innerHTML = '<p class="status-line err">这份凭据里没有 agent 名。</p>'; return; }
+  out.innerHTML = '<p class="status-line">预演中…</p>';
+  try {
+    const plan = await api('/contain', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agent: agent, reason: '控制台预演', dryRun: true })
+    });
+    const items = ['<li><span class="mono">' + esc(plan.agent) + '</span>（本人）</li>']
+      .concat((plan.cascaded || []).map((x) => '<li><span class="mono">' + esc(x.agent) +
+        '</span>（第 ' + x.depth + ' 层，来自 ' + esc(x.via) + '）</li>'));
+    out.innerHTML = '<div class="cascade"><strong>预演：没有执行任何动作。</strong>' +
+      '真的动手要显式确认：<ol>' + items.join('') + '</ol>' +
+      '<code>ratchet contain --api $ASAS_API --agent ' + esc(agent) + ' --reason "…" --yes</code></div>';
+  } catch (err) {
+    out.innerHTML = '<p class="status-line err">预演失败：' + esc(err.message) + '</p>';
+  }
+}
+
+$('go').addEventListener('click', () => query($('subject').value));
+$('subject').addEventListener('keydown', (e) => { if (e.key === 'Enter') query(e.target.value); });
+document.addEventListener('keydown', (e) => {
+  if (e.key === '/' && document.activeElement !== $('subject')) {
+    e.preventDefault();
+    $('subject').focus();
+  }
+});
+
+loadLedger().then(() => {
+  const first = (((state.ledger || {}).credentials) || []).flatMap((c) => c.assets || [])[0];
+  if (first) { $('subject').value = first; query(first); }
+}).catch((err) => {
+  $('health').textContent = '连不上';
+  $('health-dot').classList.add('bad');
+  say('拉取台账失败：' + err.message + '　控制面还活着吗？试试 curl $ASAS_API/healthz', true);
+});
+</script>
+</body>
+</html>

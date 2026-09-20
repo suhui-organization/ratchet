@@ -46,6 +46,11 @@ spec:
         - name: api
           image: {{ printf "%s/%s:%s" (.Values.image.repositoryPrefix | trimSuffix "/") .Values.image.api.repository .Values.image.api.tag | quote }}
           imagePullPolicy: {{ .Values.image.api.pullPolicy }}
+          env:
+            # 控制台要显示"这是哪一版"。版本从镜像 tag 来，单一事实源，
+            # 不在代码里再写一个常量（两处版本号一定会漂）。
+            - name: ASAS_VERSION
+              value: {{ .Values.image.api.tag | quote }}
           ports:
             - name: http
               containerPort: {{ .Values.api.port }}
