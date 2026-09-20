@@ -35,6 +35,23 @@ def _sorted_union(*groups) -> list[str]:
     return sorted(out)
 
 
+def _server_facts(inventory: dict | list | None) -> dict[str, dict]:
+    """从扫描产物里取 server 级事实。
+
+    接受两种形状：完整 inventory（带 ``servers`` 字段）或裸的 facts 数组
+    （``ratchet deliver`` 落盘的就是后者）。**只取元数据**：名字、被声明的包引用、定版状态。
+    环境变量的值从来不在这条链路上。
+    """
+    if inventory is None:
+        return {}
+    items = inventory.get("servers") if isinstance(inventory, dict) else inventory
+    out: dict[str, dict] = {}
+    for item in items or []:
+        if isinstance(item, dict) and item.get("name"):
+            out[str(item["name"])] = item
+    return out
+
+
 def build_attestation(
     policy: dict,
     *,
@@ -68,10 +85,14 @@ def build_attestation(
 
     # 枚举结果（有 inventory 才能说"这个 server 有 N 个工具"）
     reachable: dict[str, int] = {}
-    for item in ((inventory or {}).get("tools") or []):
+    # inventory 有两种形状：完整 inventory（dict，带 tools/servers）或裸 facts 数组（list）。
+    tools = inventory.get("tools") if isinstance(inventory, dict) else None
+    for item in (tools or []):
         server = str(item.get("server") or "")
         if server:
             reachable[server] = reachable.get(server, 0) + 1
+
+    facts = _server_facts(inventory)
 
     unknown: list[dict] = []
     assets: list[dict] = []
@@ -88,8 +109,10 @@ def build_attestation(
             {
                 "kind": "server",
                 "name": server,
-                "version": None,
-                "pinned": None,  # 扫描产物里没有定版状态 → 由下面的 unknown 承担
+                # 定版状态与版本引用是**配置里看得到的事实**，能拿到就必须写进来，
+                # 不能一律退化成 unknown——那会浪费这份凭据的信息量。
+                "version": (facts.get(server, {}).get("ref") or None),
+                "pinned": facts.get(server, {}).get("pinned"),
                 "contentHash": None,
                 "descHash": _sha256_text(descriptor),
                 "reachableTools": reachable.get(server),
@@ -100,16 +123,18 @@ def build_attestation(
             "why": "本机扫描拿不到制品本体，无法计算产物哈希（不填假值）",
             "discoveredAt": moment.isoformat(),
         })
-        unknown.append({
-            "what": f"{server}: pinned",
-            "why": "当前扫描产物未记录定版状态；需要 scan 侧补齐后才能断言",
-            "discoveredAt": moment.isoformat(),
-        })
-        unknown.append({
-            "what": f"{server}: version",
-            "why": "扫描产物未记录被解析到的具体版本",
-            "discoveredAt": moment.isoformat(),
-        })
+        if facts.get(server, {}).get("pinned") is None:
+            unknown.append({
+                "what": f"{server}: pinned",
+                "why": "这条定义没有包引用（例如远程 URL server），无法判断定版状态",
+                "discoveredAt": moment.isoformat(),
+            })
+        if not facts.get(server, {}).get("ref"):
+            unknown.append({
+                "what": f"{server}: version",
+                "why": "没有包引用可记录版本",
+                "discoveredAt": moment.isoformat(),
+            })
         if reachable.get(server) is None:
             unknown.append({
                 "what": f"{server}: reachableTools",

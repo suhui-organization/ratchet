@@ -31,6 +31,13 @@ type Server struct {
 	Source string `json:"source"`
 	// Risk 是确定性判定的风险标记（例如 npx 拉未锁版本的包）。
 	Risk string `json:"risk,omitempty"`
+	// Ref 是被声明的包引用（如 chrome-devtools-mcp@latest 或 firecrawl-mcp）。
+	// Pinned 为 nil 表示"不适用"（例如远程 URL server 根本没有包引用）。
+	//
+	// 为什么要把这两项结构化：ASAS-3.1 要求"定版 或 有书面豁免"，
+	// 而"定版与否"在配置里是**看得到的事实**——它不该在凭据里退化成 unknown。
+	Ref    string `json:"ref,omitempty"`
+	Pinned *bool  `json:"pinned,omitempty"`
 }
 
 // Harness 是一个 agent 运行环境。
@@ -165,6 +172,10 @@ func parseConfig(path, format, dialect string) ([]Server, error) {
 			sort.Strings(server.EnvKeys)
 		}
 		server.Risk = assessRisk(server)
+		if ref := declaredRef(server); ref != "" {
+			p := pinned(ref)
+			server.Ref, server.Pinned = ref, &p
+		}
 		servers = append(servers, server)
 	}
 	return servers, nil
@@ -194,6 +205,22 @@ func assessRisk(s Server) string {
 }
 
 // pinned 判断一个包参数是否锁定了具体版本。
+// declaredRef 找出这条定义里被声明的包引用（npx/uvx 家族的第一个非选项参数）。
+func declaredRef(s Server) string {
+	switch filepath.Base(s.Command) {
+	case "npx", "uvx", "bunx", "pnpx":
+	default:
+		return ""
+	}
+	for _, arg := range s.Args {
+		if strings.HasPrefix(arg, "-") || strings.HasPrefix(arg, "/") || strings.HasPrefix(arg, ".") {
+			continue
+		}
+		return arg
+	}
+	return ""
+}
+
 //
 // 真机数据逼出来的规则：`@latest` 看着像带版本，实际是"每次装都拉最新"——
 // 它比不写版本号还危险，因为它看起来像是被钉住了。

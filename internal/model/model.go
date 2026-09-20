@@ -39,6 +39,22 @@ type Inventory struct {
 	Format string            `json:"format"`
 	Agent  string            `json:"agent,omitempty"`
 	Tools  []ToolObservation `json:"tools"`
+	// Servers 是 server 级事实（ASAS-3.1/3.2 的输入）：定版状态、被声明的包引用、来源配置。
+	// 只记这些元数据，不记任何环境变量值。
+	Servers []ServerFact `json:"servers,omitempty"`
+}
+
+// ServerFact 是扫描侧对一条 MCP server 定义观察到的事实。
+//
+// Pinned 为 nil 表示"不适用或未判定"——ASAS-A 里它必须显式声明为 unknown，
+// 不允许悄悄当成"已定版"。
+type ServerFact struct {
+	Name    string `json:"name"`
+	Command string `json:"command,omitempty"`
+	Source  string `json:"source,omitempty"`
+	Ref     string `json:"ref,omitempty"`
+	Pinned  *bool  `json:"pinned,omitempty"`
+	Risk    string `json:"risk,omitempty"`
 }
 
 // ServerRules 是一个 MCP server 下的工具分组。

@@ -49,6 +49,24 @@ def test_build_with_inventory_marks_tools_known():
     assert "filesystem: reachableTools" not in declared
 
 
+def test_server_facts_turn_unknown_into_known():
+    """扫描侧给了事实，凭据就必须用上——否则等于浪费信息量。"""
+    facts = [
+        {"name": "filesystem", "ref": "filesystem-mcp@1.2.3", "pinned": True},
+        {"name": "kubernetes", "ref": "mcp-server-kubernetes", "pinned": False},
+    ]
+    att = asas_build.build_attestation(POLICY, org="acme", inventory=facts)
+    by_name = {a["name"]: a for a in att["assets"]}
+    assert by_name["filesystem"]["pinned"] is True
+    assert by_name["filesystem"]["version"] == "filesystem-mcp@1.2.3"
+    assert by_name["kubernetes"]["pinned"] is False
+    declared = " ".join(u["what"] for u in att["unknown"])
+    assert "filesystem: pinned" not in declared and "filesystem: version" not in declared
+    # 内容哈希仍然未知：本机扫描拿不到制品本体，这一步不能假装
+    assert by_name["filesystem"]["contentHash"] is None
+    assert "filesystem: contentHash" in declared
+
+
 def test_self_check_passes_on_generated_attestation():
     att, report = asas_build.build_and_verify(POLICY, org="acme")
     assert report.ok is True, [r.as_dict() for r in report.results]

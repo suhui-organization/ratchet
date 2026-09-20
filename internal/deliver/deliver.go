@@ -79,6 +79,10 @@ func Run(opts Options) (Result, error) {
 	// 清单：静态扫描给不出工具名，所以这里只把 server 当作"能力面"的近似。
 	// 要真实工具名，先用 scan --introspect 产出清单，再用 --inventory 传进来。
 	inv := inventoryFrom(report, opts.Agent)
+	// server 级事实落盘：ASAS-A 凭据要用它把"定版状态/版本"从 unknown 变成已知。
+	if err := writeJSON(filepath.Join(opts.OutDir, "serverfacts.json"), inv.Servers); err != nil {
+		return res, err
+	}
 
 	// ② 观测（有语料才做）
 	if opts.Calls != "" {
@@ -165,7 +169,7 @@ func Run(opts Options) (Result, error) {
 	attArgs := append([]string{}, opts.ReportCmd...)
 	attArgs = append(attArgs, "asas",
 		"--policy", policyPath, "--dir", delivery, "--org", org, "--owner", owner)
-	if inv := filepath.Join(opts.OutDir, "inventory.json"); fileExists(inv) {
+	if inv := filepath.Join(opts.OutDir, "serverfacts.json"); fileExists(inv) {
 		attArgs = append(attArgs, "--inventory", inv)
 	}
 	attCmd := exec.Command(attArgs[0], attArgs[1:]...)
@@ -199,6 +203,10 @@ func inventoryFrom(rep discover.Report, agent string) model.Inventory {
 	for _, h := range rep.Harnesses {
 		for _, s := range h.Servers {
 			inv.Tools = append(inv.Tools, model.ToolObservation{Server: s.Name, Tool: s.Name})
+			inv.Servers = append(inv.Servers, model.ServerFact{
+				Name: s.Name, Command: s.Command, Source: s.Source,
+				Ref: s.Ref, Pinned: s.Pinned, Risk: s.Risk,
+			})
 		}
 	}
 	return inv
