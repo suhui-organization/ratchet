@@ -91,6 +91,9 @@ helm upgrade --install asas deploy/k8s/helm/asas -n asas \
 
 ## 7. 当前进度快照
 
+> **这份快照只讲"计划里的切片"。** 整体现状（含没做完的、红灯、下一步）
+> 以 [STATUS.md](STATUS.md) 为准，那份是单一事实来源。
+
 | 切片 | 状态 |
 |---|---|
 | ASAS v0.1 规范 + schema | ✅ |
