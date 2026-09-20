@@ -15,6 +15,8 @@ permissions:
   contents: write
   # 推 GHCR 需要它；只写 contents 的话镜像会推不上去
   packages: write
+  # MCP Registry 的 OIDC 认证需要它（见文末「发布到官方 MCP Registry」那一步）
+  id-token: write
 
 jobs:
   release:
@@ -99,3 +101,30 @@ jobs:
           echo "$OUT"
           echo "$OUT" | grep -q '"serverInfo"' || { echo "❌ 镜像没有回应 initialize"; exit 1; }
           echo "✅ 镜像能完成 MCP 握手"
+
+      # ── 发布到官方 MCP Registry（OIDC，不需要人工点授权）───────────────────
+      # 为什么改成 OIDC：原先是在本地跑 `publisher login github`（设备码 + 几分钟就过期的
+      # JWT）。实测两次因为出网抖动把窗口耗掉——一次 registry i/o timeout、一次连接被重置，
+      # 白白浪费授权。OIDC 的令牌由 GitHub 现场签发，没有"抢时间"这回事。
+      # 于是整条发布链路变成：打 tag → CI 编译 → 推 GHCR → 发 release → 自动重发 Registry。
+      - name: Publish to the official MCP Registry
+        run: |
+          set -euo pipefail
+
+          # 版本必须与本次 tag 一致。不一致时**跳过而不是硬发**：
+          # Registry 上挂一个指向不存在镜像的版本，不会有任何东西报错，只会一直错下去。
+          TAG="${GITHUB_REF_NAME#v}"
+          HAVE=$(python3 -c "import json;print(json.load(open('server.json'))['version'])")
+          if [ "$TAG" != "$HAVE" ]; then
+            echo "⚠️ server.json 写的是 $HAVE，本次 tag 是 $TAG —— 跳过 Registry 发布（先把 server.json 改到一致再重发）"
+            exit 0
+          fi
+
+          OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+          ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
+          curl -fsSL --retry 5 --retry-all-errors -o /tmp/mcp-publisher.tar.gz \
+            "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_${OS}_${ARCH}.tar.gz"
+          tar -xzf /tmp/mcp-publisher.tar.gz -C /tmp mcp-publisher
+
+          /tmp/mcp-publisher login github-oidc
+          /tmp/mcp-publisher publish
