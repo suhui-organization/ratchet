@@ -486,3 +486,37 @@ Claude Desktop 用户下载即装——**不需要 Smithery 做中间人**，还
    `tab.playwright.evaluate` 直接读 `article` 里的链接很稳，本轮 5 条一次全取到。
    **顺带**：Playwright 的 locator **会穿透 shadow DOM**，所以"Reddit 评论按钮在 shadow DOM 里
    点不到"这个结论**可能不再成立**——本轮没有值得回的帖，没法验证；下一轮遇到真讨论帖时用它试一次。
+
+### 养号进度 / 点对点回复（2026-09-20 21:30 档）
+
+**X：本轮 2 条**（每条都先查 `isEnabled()`；脚本里同时断言输入框字数与按钮状态）
+
+1. **@Chris_L_Elliott**（Codex 沙箱逃逸：Heapjack / Overpatch，指出"read-only 在被证实之前只是营销"）：251 字符，已发。
+   角度：read-only 在没有可复核手段前是一句声明；本机 12/16 未锁、164 工具可达，而标签一直写着 read-only。
+   反问：什么能让你信它——测试套件，还是你自己能跑一次的检查。
+2. **@hazemomier**（Microsoft Agent Framework 破坏性变更：provider-backed MCP 会话改为按调用隔离；"Data separation first"）：261 字符，已发。
+   角度：会话隔离解决的是**一条轴**（状态串味）；另一条轴是"每个工具能碰到什么"，通常没被测量。
+   反问：per-invocation scope 是说明了工具能碰什么，还是只隔离了状态。
+
+**本轮未选用**：@nabilblk（多 agent 协作层开源，偏自荐）、@LFrefman（Agent-Native，产品自荐）、
+@arthur_win8（Grok 用法整理，与主题无关）、@DaedalusAgents（MCP findings 供应商，同类）、
+@cv_usk（world model 仓库）。
+
+**HN：本轮不发** —— 今日 2 条额度已在 09:30 与第二轮用满。
+
+**Reddit：仍无值得回的帖，按铁律什么都不发。**
+- `r/mcp/search?q=permissions|security|token`（按新排序）：命中全是产品自荐
+  （Tronsave 测试网、某自托管授权服务器 v0.2.0、动态 MCP 生成器招人、某研究 agent 应用）。
+- `r/ClaudeAI/search?q=MCP permissions|access|security`（按周新排序）：命中是 token 用量抱怨、
+  agent dispatcher 自荐、文件操作 MCP 自荐——都不适合参与。
+
+**方法备注（写下来免得下次重踩）**
+
+1. `cua_repl` 是**严格模式**：`tab = await cua.getTab(...)` 这种未声明赋值会抛
+   `tab is not defined`，必须 `let tab = ...` 或 `var`。本轮在这个坑上浪费了一次调用。
+2. 内置浏览器里**代理创建的标签在回合结束会被关掉**；要跨回合复用必须先 `tab.markHandoff()`。
+   本轮已改成：建标签 → 立刻 markHandoff → 后续 `getTab(<id>, {browser:"iab", emit:false})`
+   （`emit:false` 可以避免每次调用都打印整棵无障碍树）。
+3. Reddit 的 shadow-DOM 点击**这轮仍未能验证**（没有值得回的帖）。
+   方法上仍认为可行（Playwright locator 会穿透 shadow DOM），留到有真讨论帖时再试，
+   在此之前不要把渠道状态写成"已解锁"。
