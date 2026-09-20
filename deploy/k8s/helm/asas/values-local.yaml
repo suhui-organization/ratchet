@@ -13,7 +13,7 @@ image:
   repositoryPrefix: swr.ap-southeast-3.myhuaweicloud.com/digital-finance
   pullSecrets: []
   api:
-    tag: "0.1.0-c5503cb"
+    tag: "0.1.0-7e2eeb0"
     pullPolicy: IfNotPresent
 
 api:

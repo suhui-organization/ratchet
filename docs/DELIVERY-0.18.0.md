@@ -141,3 +141,32 @@ $ curl -X POST $API/verify --data-binary @att5.json
 | T26 | 日志轮转声明（`rotation` 语义）→ 让断流能真正影响合规判定 | 合法轮转不被误判；改写仍然失败 |
 | T27 | 分段上传 + 锚点续接 | 只传增量，控制面仍能比对前缀 |
 | T28 | 把 v0.3 的口径送去外部评审（评审稿同步加两条） | 至少 1 位不相关的人能照着实现出同样的哈希 |
+
+## 7. 镜像与当前集群状态
+
+```console
+$ make images IMAGE_TAG=0.1.0-p5       # 构建（provenance 关掉，见 0.16.0 §3.5）
+$ docker push …/asas-api:0.1.0-7e2eeb0 # 用提交号重打 tag
+api    …/asas-api@sha256:21e9facdc3497992d9b865da7e69253032fb47dccc5c63e1e2355b605d494622
+sensor …/asas-sensor@sha256:dcff9ad154d59e639910d97734ff9e0a3e7cca3f780025b5f25d11bea02ea652
+```
+
+两个 tag（`0.1.0-p5` 与 `0.1.0-7e2eeb0`）指向同一个镜像 ID——验证过镜像内容确实来自提交 `7e2eeb0`。
+
+**本机集群状态**：`ns=asas` 里 `asas-api` 0.1.0-p5 Running；`asas-sensor` CronJob 每天 09:00 跑一趟。
+台账里有 7 份凭据、2 条遏制记录、**1 条断流记录**（就是 §3.4 那次验收留下的：
+本地日志被改写，检出 seq 1、seq 2 与上次不一致）。
+
+**注意**：kind 节点里的夹具 `/var/asas-scan/.ratchet/calls.jsonl` 现在是**改写后**的版本
+（那次演示改的）。它和台账里的前缀一致，所以后续采集不会重复报同一条断流。
+要回到演示前的状态，把 `write_file` 那条的 `decision` 改回 `deny` 即可——
+届时下一次采集会**正确地**再报一次断流（因为那也是一次改写）。
+
+复现：
+
+```bash
+kubectl -n asas port-forward --address 127.0.0.1 svc/asas-api 28080:8080 &
+export ASAS_API=http://127.0.0.1:28080
+./bin/ratchet chain --calls ~/.ratchet/calls.jsonl --out /tmp/events.jsonl
+curl -sS $ASAS_API/silence | python3 -m json.tool
+```

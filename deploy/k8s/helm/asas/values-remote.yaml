@@ -4,7 +4,7 @@ image:
   pullSecrets:
     - name: ratchet-swr        # 复用同一个 SWR 组织的拉取密钥
   api:
-    tag: "0.1.0-c5503cb"
+    tag: "0.1.0-7e2eeb0"
 
 api:
   replicaCount: 1
@@ -17,5 +17,5 @@ api:
 # 传感器该跑在有 agent 的那台机器上，集群内定时采集只在节点就是宿主机时成立。
 sensor:
   image:
-    tag: "0.1.0-c5503cb"
-    digest: "sha256:0e6dc626f435e0fe5089ebc853ff7565d7f7a36b8f2fab6fb9a620aad02ccc4e"
+    tag: "0.1.0-7e2eeb0"
+    digest: "sha256:dcff9ad154d59e639910d97734ff9e0a3e7cca3f780025b5f25d11bea02ea652"
