@@ -52,6 +52,16 @@ spec:
                   value: {{ .Values.sensor.apiURL | default (printf "http://asas-api:%v" .Values.api.port) | quote }}
                 - name: ASAS_ORG
                   value: {{ .Values.sensor.org | quote }}
+                # agent 名必须**稳定**：控制面按 (组织, agent) 存链摘要，跨次比对靠它。
+                # 容器主机名是 Pod 名（每跑一次都变），所以默认注入**节点名**。
+                - name: ASAS_AGENT
+                  {{- if .Values.sensor.agent }}
+                  value: {{ .Values.sensor.agent | quote }}
+                  {{- else }}
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: spec.nodeName
+                  {{- end }}
                 - name: SCAN_HOME
                   value: {{ .Values.sensor.scanHome | quote }}
                 - name: OUT

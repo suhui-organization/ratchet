@@ -18,8 +18,11 @@ image:
 
 api:
   replicaCount: 1
-  serviceType: ClusterIP
-  nodePort: 0
+  # 人工验证要一个**固定地址**：kind 的节点是个容器，它的 IP 从宿主机直达，
+  # 所以 NodePort 比 `kubectl port-forward` 靠谱——后者是前台进程，
+  # 一关终端就断，而且这台机器上已经有别的服务占着 18082 之类的端口（踩过）。
+  serviceType: NodePort
+  nodePort: 30090
   persistence:
     enabled: true
     size: 1Gi

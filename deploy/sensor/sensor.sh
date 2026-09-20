@@ -12,6 +12,7 @@
 # 环境变量：
 #   ASAS_API        控制面地址，例如 http://asas-api.asas.svc:8080
 #   ASAS_ORG        凭据主体（组织名），传给 deliver 的 --client
+#   ASAS_AGENT      agent 名（**必须是稳定的**：跨次比对链摘要用它当键）
 #   SCAN_HOME       要扫描的 HOME（容器里通常是挂进来的 /scan）
 #   ASAS_PROJECT    项目级配置目录（可选；不给就扫一个空目录，见下）
 #   ASAS_EXEMPT     书面豁免，形如 name=YYYY-MM-DD,...（可选）
@@ -49,6 +50,11 @@ if [ -f "$SCAN_HOME/.ratchet/calls.jsonl" ]; then
 else
   echo "==> 没有调用记录（$SCAN_HOME/.ratchet/calls.jsonl）：事件流会是空的"
   echo "    hook 没接的话这很正常——凭据里会把这条规则如实记为'未评估'。"
+fi
+# agent 名必须是稳定的：默认取宿主节点名（chart 从 spec.nodeName 注入）。
+# 用容器主机名的话每次跑都不一样，跨次比对就永远比不出东西来。
+if [ -n "${ASAS_AGENT:-}" ]; then
+  set -- "$@" --agent "$ASAS_AGENT"
 fi
 if [ -n "${ASAS_EXEMPT:-}" ]; then
   set -- "$@" --exempt "$ASAS_EXEMPT"

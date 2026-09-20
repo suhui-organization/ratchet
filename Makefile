@@ -1,4 +1,4 @@
-.PHONY: test go-test py-test web-test build fmt dist release images push-images
+.PHONY: test go-test py-test web-test build fmt dist release images push-images local-gateway deploy-local
 
 GO ?= go
 PY ?= python3
@@ -117,3 +117,20 @@ push-images: images
 	@echo "把下面这两个 digest 填进 Helm values（sensor.image.digest / image.api.digest）："
 	@docker inspect $(IMAGE_PREFIX)/asas-api:$(IMAGE_TAG) --format '  api    {{index .RepoDigests 0}}'
 	@docker inspect $(IMAGE_PREFIX)/asas-sensor:$(IMAGE_TAG) --format '  sensor {{index .RepoDigests 0}}'
+
+# 给本机 kind 集群开一个固定地址（宿主机打不到 kind 节点的 IP，见脚本里的解释）。
+local-gateway:
+	@bash scripts/local-gateway.sh
+
+# 本机 kind 集群的部署（人工验证用）。一条命令，幂等：
+#   make deploy-local
+# 明细见 docs/VERIFY-LOCAL.md。镜像 tag/digest 写在 values-local-verify.yaml 里，
+# 不在这里写死——同上，单一事实源。
+deploy-local:
+	helm upgrade --install asas deploy/k8s/helm/asas -n asas --create-namespace \
+	  -f deploy/k8s/helm/asas/values-local.yaml \
+	  -f deploy/k8s/helm/asas/values-local-verify.yaml \
+	  --set 'image.pullSecrets[0].name=swr-creds' --wait
+	@kubectl -n asas get deploy,svc,cronjob --no-headers
+	@echo
+	@echo "控制面地址： http://127.0.0.1:30090    （没有就 bash scripts/local-gateway.sh）"

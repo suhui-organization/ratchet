@@ -46,6 +46,9 @@ sensor:
     digest: ""
     pullPolicy: IfNotPresent
   org: unknown-org
+  # agent 名（写进凭据与控制面的链摘要索引）。留空 = 用**节点名**（spec.nodeName）。
+  # 为什么不用容器主机名：它是 Pod 名，每跑一次都变，跨次比对就永远比不出东西。
+  agent: ""
   # 留空 = 集群内的 asas-api Service（同 namespace）。
   apiURL: ""
   # 要扫描的宿主目录（hostPath）。挂进来后容器只读读它。

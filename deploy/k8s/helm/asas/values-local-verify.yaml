@@ -1,0 +1,28 @@
+# 本机人工验证用（docs/VERIFY-LOCAL.md）的叠加值。
+#
+# 为什么进仓库而不是放 /tmp：这是"本机这套部署到底长什么样"的唯一记录。
+# 放在临时目录里，重启一次机器就没人知道当初装的是哪个镜像、哪个路径——
+# 而排查问题时第一个要问的就是这个。
+#
+# 用法：make deploy-local
+sensor:
+  enabled: true
+  schedule: "0 9 * * *"
+  org: local-verify
+  # kind 的节点是容器，看不到宿主机家目录（见 docs/DELIVERY-0.16.0.md §6.1），
+  # 所以这里指向一颗放进节点里的夹具树，而不是 /home。
+  hostScanPath: /var/asas-scan
+  scanHome: /scan
+  image:
+    tag: "0.1.0-p5"
+    # 固定 digest：同一个 tag 可以被推成另一个镜像，digest 不会。
+    digest: "sha256:dcff9ad154d59e639910d97734ff9e0a3e7cca3f780025b5f25d11bea02ea652"
+  # 宿主机家目录属于 uid 1000，容器用同一个身份才读得到。
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+  # 本机真实的 12 个未定版 server：书面豁免到 2026-12-31（ASAS-3.1）。
+  # 写进文件而不是 --set —— 逗号在 --set 里是赋值分隔符（踩过，见 values-guard.yaml）。
+  exempt: "chrome-devtools=2026-12-31,mcp-server-amap=2026-12-31,mcp-server-context7=2026-12-31,mcp-server-docker=2026-12-31,mcp-server-firecrawl=2026-12-31,mcp-server-gitee=2026-12-31,mcp-server-kubernetes=2026-12-31,mcp-server-memory=2026-12-31,mcp-server-playwright=2026-12-31,mcp-server-st=2026-12-31,superpowers=2026-12-31,xapi=2026-12-31"

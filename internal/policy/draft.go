@@ -166,6 +166,11 @@ func Draft(inv model.Inventory, opts Options) model.Policy {
 	if opts.Agent != "" {
 		agent = opts.Agent
 	}
+	if agent == "" {
+		// 没有 agent 名的凭据等于没有身份：ASAS-1.1 要的是"可枚举、具名"，
+		// 而字面量 "agent" 对每一台机器都一样，等于没写。
+		agent = DefaultAgent()
+	}
 	now := opts.Now
 	if now.IsZero() {
 		now = time.Now()

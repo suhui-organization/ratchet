@@ -72,6 +72,12 @@ func Run(opts Options) (Result, error) {
 	if opts.OutDir == "" {
 		return res, fmt.Errorf("需要 --out（交付目录）")
 	}
+	// agent 名在整条流水线里只算一次：清单、策略、事件流、凭据用的是同一个值。
+	// 不给就取短主机名（见 policy.DefaultAgent）——**绝不留空**：
+	// 空名或字面量 "agent" 会让"这台机器是谁"在凭据里消失，而那是第一条规定。
+	if opts.Agent == "" {
+		opts.Agent = policy.DefaultAgent()
+	}
 	if err := os.MkdirAll(opts.OutDir, 0o755); err != nil {
 		return res, err
 	}
