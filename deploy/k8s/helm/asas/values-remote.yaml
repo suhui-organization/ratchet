@@ -4,7 +4,7 @@ image:
   pullSecrets:
     - name: ratchet-swr        # 复用同一个 SWR 组织的拉取密钥
   api:
-    tag: "0.1.0-bootstrap"
+    tag: "0.1.0-6108270"
 
 api:
   replicaCount: 1

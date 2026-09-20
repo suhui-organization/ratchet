@@ -1,0 +1,26 @@
+# 本机 kind 集群（kind-desktop）的收敛值。
+#
+# 为什么单独一份，而不是复用 values-remote：
+#   1. 本机 kind **拉不到 SWR**，镜像用 `kind load docker-image` 灌进去，
+#      所以不需要 pullSecrets（用 --set 清空列表反而会塞进一个空串，实测踩过）；
+#   2. kind 默认没有 NodePort 端口映射，用 ClusterIP + port-forward 验证更省事。
+#
+# 用法：
+#   kind load docker-image <prefix>/asas-api:<tag> --name desktop
+#   helm upgrade --install asas deploy/k8s/helm/asas -n asas --create-namespace \
+#     -f deploy/k8s/helm/asas/values-local.yaml --wait
+image:
+  repositoryPrefix: swr.ap-southeast-3.myhuaweicloud.com/digital-finance
+  pullSecrets: []
+  api:
+    tag: "0.1.0-6108270"
+    pullPolicy: IfNotPresent
+
+api:
+  replicaCount: 1
+  serviceType: ClusterIP
+  nodePort: 0
+  persistence:
+    enabled: true
+    size: 1Gi
+    storageClass: ""     # 空 = 用 kind 自带的 standard
