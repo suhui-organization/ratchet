@@ -127,7 +127,15 @@ def test_self_check_passes_on_generated_attestation():
 
 
 def test_generated_attestation_validates_against_schema():
-    jsonschema = __import__("jsonschema")
+    try:
+        import jsonschema
+    except ModuleNotFoundError:  # pragma: no cover - 只在环境缺依赖时走到
+        # 这里**故意不用 importorskip**：schema 校验是这份规范的核心，
+        # 缺依赖时静默跳过，等于把"交付物符合 schema"这件事从门禁里拿掉了。
+        # 真实踩过：本机装了这个包说"全绿"，CI 没装，发布第一步就红。
+        raise AssertionError(
+            "schema 校验需要 jsonschema：pip install -r service/requirements-dev.txt"
+        )
     from pathlib import Path
 
     schema = json.loads(Path(__file__).resolve().parents[2].joinpath("spec/ASAS-A-v0.1.schema.json").read_text())

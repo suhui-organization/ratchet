@@ -39,7 +39,9 @@ jobs:
       - name: Service tests
         working-directory: service
         run: |
-          python -m pip install -q pytest
+          # 依赖从 requirements-dev.txt 装：写在这里的清单少一个包，
+          # 本机"全绿"、CI 红——这个坑已经踩过一次（jsonschema）。
+          python -m pip install -q -r requirements-dev.txt
           python -m pytest -q
 
       # 四平台产物：install.sh 按 uname 挑对应的那一个

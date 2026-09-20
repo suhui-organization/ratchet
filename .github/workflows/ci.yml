@@ -1,0 +1,54 @@
+name: CI
+
+# 这个 workflow 存在的唯一理由，是一次真实的翻车：
+#
+# 在此之前，**只有 release.yml 会跑测试**，而它只在打 tag 时触发。
+# 于是一整天的开发里，"测试全绿"都是在本机说的——本机碰巧装了 jsonschema，
+# CI 没装，结果 0.13.0 的发布会话第一步就红，装到用户手上的还是旧的东西。
+# 门禁只在发布时跑，等于没有门禁。
+#
+# 现在就两条：能编译、测试过。跑得快（几十秒），所以每次 push 都跑得起。
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go vet ./...
+      - run: go test ./...
+      - run: go build -o /tmp/ratchet ./cmd/ratchet
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Service tests
+        working-directory: service
+        run: |
+          python -m pip install -q -r requirements-dev.txt
+          python -m pytest -q
+
+      # 交付流水线本身也要能跑：这一条会在 PR 里抓出"改了 CLI 参数但忘了改脚本"。
+      - name: Deliver pipeline smoke test
+        run: |
+          set -euo pipefail
+          export PYTHONPATH="$PWD/service/src"
+          mkdir -p /tmp/home/.codex /tmp/home/.ratchet
+          printf '[mcp_servers.demo]\ncommand="npx"\nargs=["-y","@modelcontextprotocol/server-filesystem@1.2.3"]\n' > /tmp/home/.codex/config.toml
+          printf '{"ts":"2026-09-20T01:00:00Z","agent":"ci","server":"demo","tool":"read_file","decision":"allow"}\n' > /tmp/home/.ratchet/calls.jsonl
+          /tmp/ratchet deliver --out /tmp/out --home /tmp/home --calls /tmp/home/.ratchet/calls.jsonl \
+            --client ci --report-cmd "python3 -m ratchet_service.cli" | tee /tmp/deliver.log
+          grep -q 'chain' /tmp/deliver.log
+          test -f /tmp/out/delivery/events.jsonl
