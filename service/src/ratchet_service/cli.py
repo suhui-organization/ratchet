@@ -49,6 +49,14 @@ def main(argv: list[str] | None = None) -> int:
     p_asas.add_argument("--exempt", action="append", default=[],
                         help="未定版组件的书面豁免：name=YYYY-MM-DD（可重复，ASAS-3.1）")
 
+    # ASAS-3.4：两次凭据的差异。"今天有什么变了"才是有人会看的东西。
+    p_diff = sub.add_parser("asas-diff", help="比较两份 ASAS-A 凭据（ASAS-3.4）")
+    p_diff.add_argument("old")
+    p_diff.add_argument("new")
+    p_diff.add_argument("--json", action="store_true")
+    p_diff.add_argument("--fail-on", default="high", choices=["critical", "high", "medium", "info"],
+                        help="达到该严重度就返回非 0（默认 high），供每日巡检/CI 使用")
+
     args = parser.parse_args(argv)
 
     if args.cmd == "build":
@@ -85,6 +93,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "asas":
         return _asas(args)
+
+    if args.cmd == "asas-diff":
+        return _asas_diff(args)
 
     return 2
 
@@ -201,5 +212,27 @@ def _parse_exemptions(items) -> dict:
     return out
 
 
+def _asas_diff(args) -> int:
+    from . import asas_diff
+
+    old = json.loads(Path(args.old).read_text(encoding="utf-8"))
+    new = json.loads(Path(args.new).read_text(encoding="utf-8"))
+    changes = asas_diff.diff(old, new)
+    summary = asas_diff.summarize(changes)
+
+    if args.json:
+        print(json.dumps({"summary": summary, "changes": changes}, ensure_ascii=False, indent=2))
+    elif not changes:
+        print("无变化——两次凭据一致（这本该是好消息）")
+    else:
+        print(f"发现 {summary['total']} 处变化：{summary['bySeverity']}")
+        for c in changes:
+            print(f"  [{c['severity']:8s}] {c['kind']:20s} {c['subject']}")
+            print(f"             {c['why']}")
+
+    threshold = {"critical": 0, "high": 1, "medium": 2, "info": 3}[args.fail_on]
+    worst = min(({"critical": 0, "high": 1, "medium": 2, "info": 3}[c["severity"]] for c in changes),
+                default=99)
+    return 1 if worst <= threshold else 0
 if __name__ == "__main__":
     sys.exit(main())
