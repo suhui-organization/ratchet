@@ -78,10 +78,16 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprint(os.Stderr, `ratchet — 从 agent 的真实行为编译最小权限策略
+	fmt.Fprint(os.Stderr, `ratchet — Agent 侧的工具：从 agent 的真实行为编译最小权限策略，并产出可被验证的凭据
 
-用法：
-  ratchet version
+三个角色（详细见 docs/ROLES.md）：
+  Agent 侧（本工具）  跑在被管的机器上：观测 + 出证 + 上报。**只读，不拦截调用。**
+  控制面（server）    跑在集群里：汇总台账、复算验证、跨次比对、遏制记录、查询、控制台页面。
+  收货方              客户/审计员：拿凭据自己验，不需要装东西，也不需要控制面在线。
+
+命令分两个面——**采集面不出网也能用，台账面要连控制面**：
+
+【采集面｜在被管的机器上跑】
   ratchet scan [--home <dir>] [--workdir <dir>] [--introspect --allow-exec]
                [--out <清单.json>] [--share <页面.html>] [--timeout <秒>] [--json]
   ratchet observe --calls <调用记录.jsonl> [--inventory <清单.json>]
@@ -91,14 +97,19 @@ func usage() {
   ratchet mcp                                  # 以 stdio MCP server 运行
   ratchet deliver --out <目录> [--home <dir>] [--calls <记录.jsonl>]
                   [--client <名字>] [--only-observed] [--lang en-US|zh-CN]
-  ratchet reach --api <控制面> --subject <资产> [--json]
-  ratchet contain --api <控制面> --agent <id> [--reason "…"] [--dry-run|--yes]
   ratchet chain --calls <记录.jsonl> [--out <事件流.jsonl>] [--json]
-  ratchet feedback [--kind bug|false-positive|feature] [--summary "一句话"]
   ratchet policy draft --from <清单.json> [--out <策略.json>]
                        [--agent <名字>] [--strict-unknown] [--only-observed]
                        [--lang en-US|zh-CN] [--json]
   ratchet policy check --policy <策略.json>    # 从 stdin 读一次调用试跑
+
+【台账面｜连控制面才能用】
+  ratchet reach --api <控制面> --subject <资产> [--json]
+  ratchet contain --api <控制面> --agent <id> [--reason "…"] [--dry-run|--yes]
+
+【其它】
+  ratchet version
+  ratchet feedback [--kind bug|false-positive|feature] [--summary "一句话"]
 
 说明：
   scan          只读本机配置，列出装了哪些 agent、挂了哪些 MCP server。

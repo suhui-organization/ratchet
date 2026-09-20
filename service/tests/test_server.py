@@ -99,8 +99,11 @@ def test_index_page_is_html_not_a_404(api):
         html = resp.read().decode()
     for expected in ("Ratchet 控制面", "/verify", "/silence", "/reach", "没有任何认证"):
         assert expected in html, f"首页缺了 {expected}"
-    # 内网可用：页面不许引任何外部资源（一个 CDN 链接 = 一页白屏）
-    assert "//cdn" not in html and "https://" not in html
+    # 内网可用：页面**不加载**任何外部资源（一个 CDN 就等于一页白屏）。
+    # 注意区分"外链"与"外部资源"：指向 GitHub 的文字链接没问题，
+    # 会发请求的 script/link/字体/@import 才是致命的。
+    assert "<script src" not in html and "<link rel=\"stylesheet\"" not in html
+    assert "@import" not in html and "fetch('http" not in html
 
 
 def test_index_shows_live_counts(api):
@@ -152,6 +155,26 @@ def test_ledger_reports_isolation_of_each_credential(api):
     by_id = {c["id"]: c for c in ledger["credentials"]}
     assert "hashMatch" not in by_id[ident]["report"]["notEvaluated"], "传了证据的那份应当能重算哈希"
     assert "hashMatch" in by_id[another]["report"]["notEvaluated"], "没传证据的那份不该跟着变"
+
+
+def test_console_copy_has_no_markdown_marks_or_hidden_entry_point(api):
+    """控制台是 HTML，不是 Markdown。
+
+    真实缺陷：正文里写了 `**交得出东西**`，浏览器把它**原样**显示成四个星号。
+    这类错只有"真的打开看一眼"才会发现——所以把它变成断言。
+    """
+    import re
+    import urllib.request
+
+    html = urllib.request.urlopen(api + "/").read().decode()
+    body = html.split("</style>", 1)[1].split("<script>", 1)[0]
+    assert not re.search(r"\*\*[^*\n]{1,40}\*\*", body), "页面正文里残留 Markdown 加粗"
+    assert "`" not in body, "页面正文里残留 Markdown 反引号"
+
+    # 入口指引必须在页面里：陌生人打开要能看到"从哪开始"。
+    assert 'id="onboard"' in html and "把这台机器接进来" in html
+    assert "这不是防火墙" in html, "定位那句话必须在页面上"
+    assert 'id="cmd-attest"' in html, "接入命令的容器要在（内容由 JS 按当前地址填）"
 
 
 def test_attestation_roundtrip(api):

@@ -18,4 +18,4 @@ api:
 sensor:
   image:
     tag: "0.1.0-96a0f72"
-    digest: "sha256:d0ef483a3709cf814900725062172d0d8f50779d19a6b5a9dac6ad3554083828"
+    digest: "sha256:89049ff2ac156fe6d6b44fae7324ecf11d4761b1cd3caff4b1cf8dfb5581e7cd"

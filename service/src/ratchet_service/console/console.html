@@ -112,6 +112,17 @@
                 overflow-x:auto; white-space:pre }
   .notice { border:1px solid var(--warn-line); background:var(--warn-bg); color:var(--warn-ink);
             border-radius:var(--radius); padding:.6rem .75rem; font-size:.86rem }
+  .positioning { font-size:.9rem; color:var(--faint); margin:.75rem 0 0; max-width:60rem }
+  .positioning b { color:var(--ink); font-weight:600 }
+  details.onboard { margin:1.4rem 0 0; border:1px solid var(--line); border-radius:var(--radius);
+                    padding:.7rem .85rem; background:var(--surface-2) }
+  details.onboard summary { cursor:pointer; font-size:.9rem; font-weight:600 }
+  details.onboard ol { margin:.7rem 0 .2rem; padding-left:1.2rem; font-size:.88rem }
+  details.onboard li { margin-bottom:.7rem }
+  details.onboard code { display:block; margin:.35rem 0 0; padding:.5rem .6rem; background:var(--code);
+                         color:#e8ecf5; border-radius:4px; font-family:var(--mono); font-size:.78rem;
+                         overflow-x:auto; white-space:pre }
+  details.onboard .hint { color:var(--faint); font-size:.82rem; margin:.3rem 0 0 }
   .card { border:1px solid var(--line); border-radius:var(--radius); padding:.85rem .9rem }
   .card .id { font-family:var(--mono); font-size:.82rem; overflow-wrap:anywhere }
   .meta { display:grid; grid-template-columns:auto 1fr; gap:.15rem .7rem; margin:.6rem 0 .9rem;
@@ -159,7 +170,7 @@
 <div class="wrap">
   <header>
     <div class="head-row">
-      <h1>Ratchet 控制面<span class="v mono" id="version">…</span></h1>
+      <h1>Ratchet 控制面（server）<span class="v mono" id="version">…</span></h1>
       <div class="readout tnum" aria-live="polite">
         <span><span class="dot" id="health-dot"></span><span id="health">连接中</span></span>
         <span>凭据 <b id="c-cred">–</b></span>
@@ -168,6 +179,16 @@
         <span>遏制 <b id="c-contain">–</b></span>
       </div>
     </div>
+    <p class="status-line" style="margin:.5rem 0 0">
+      这一页由控制面自己提供：台账、复算验证、跨次比对、遏制记录、触达查询。
+      Agent 侧的工具是 <span class="mono">ratchet</span> CLI 与传感器（跑在被管的机器上，只读观测）；
+      收货方用验证页或离线验证器，不需要连这里。术语见 <span class="mono">docs/ROLES.md</span>。
+    </p>
+    <p class="positioning">
+      <b>这不是防火墙。</b>它解决的是另一个问题：当客户、审计或甲方问"这些 agent 到底被允许碰什么、
+      你凭什么这么说"时，你现在<b>交得出东西</b>：一份别人不用信你就能自己验的凭据。
+      拦截不在这条路上（Agent 侧只读），原因见 <span class="mono">docs/ROLES.md</span>。
+    </p>
     <div class="alert">
       <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="none"
            stroke="currentColor" stroke-width="1.4" stroke-linejoin="round">
@@ -180,8 +201,26 @@
     </div>
   </header>
 
+  <details class="onboard" id="onboard" open>
+    <summary>把这台机器接进来（两步，命令直接复制）</summary>
+    <ol>
+      <li>在<b>被管的那台机器</b>上产出一份凭据（需要 <span class="mono">ratchet</span>，装法见
+        <a href="https://github.com/suhui-organization/ratchet/releases/latest">GitHub Release</a>）：
+        <code>ratchet deliver --out /tmp/v --home "$HOME" --report-cmd "python3 -m ratchet_service.cli"</code>
+        <p class="hint">这一步完全离线也能跑：读本机真实配置，产出策略 + 报告 + 凭据 + 证据哈希。</p>
+      </li>
+      <li>把它交给控制面（地址已按当前页面填好）：
+        <code id="cmd-attest"></code>
+        <p class="hint">控制面会用<b>和 CLI 同一份规则</b>复算一遍。想连证据一起交（它才能重算哈希）：
+          用传感器，或见 <span class="mono">docs/VERIFY-LOCAL.md</span>。</p>
+      </li>
+    </ol>
+    <p class="hint">只想让人验、不想要台账？把 <span class="mono">/tmp/v/delivery</span> 整个交给收货方，
+      或让他拖进验证页；那条路<b>完全不经过这里</b>，也不需要装任何东西。</p>
+  </details>
+
   <div class="query">
-    <label for="subject">谁曾能碰过 —— 输入资产名（某个 MCP server 或工具）</label>
+    <label for="subject">谁曾能碰过：输入资产名（某个 MCP server 或工具）</label>
     <div class="field">
       <input id="subject" type="search" autocomplete="off" spellcheck="false"
              placeholder="例如 chrome-devtools，回车查询">
@@ -287,7 +326,7 @@ function renderChips() {
   const assets = Array.from(new Set(credentials.flatMap((c) => c.assets || []))).filter(Boolean).sort();
   const box = $('chips');
   if (!assets.length) {
-    box.innerHTML = '<span class="lbl">台账里还没有资产——先产出一份凭据（见右下方台账区的命令）。</span>';
+    box.innerHTML = '<span class="lbl">台账里还没有资产，先产出一份凭据（见右下方台账区的命令）。</span>';
     return;
   }
   box.innerHTML = '<span class="lbl">台账里出现过的资产：</span>' +
@@ -464,7 +503,7 @@ async function verifyAgain(c) {
     });
     const same = JSON.stringify(report.results) === JSON.stringify(c.report.results);
     out.innerHTML = '<p class="status-line">' + (same
-      ? '与上面这份完全一致——同一份规则、同一份输入。'
+      ? '与上面这份完全一致：同一份规则、同一份输入。'
       : '结果与上面不同：输入变了（新证据 / 新事件 / 新遏制记录）。上面是入账时的快照，这里是最新一次。') +
       '</p>';
   } catch (err) {
@@ -503,6 +542,12 @@ document.addEventListener('keydown', (e) => {
 });
 
 loadLedger().then(() => {
+  // 入口指引里的地址按当前页面填——不然每个人都要自己把地址抄对一次。
+  $('cmd-attest').textContent =
+    'curl -sS -X POST ' + location.origin + '/attestations \\\n' +
+    '  -H "Content-Type: application/json" \\\n' +
+    '  --data-binary @/tmp/v/delivery/attestation.json';
+  $('onboard').open = state.ledger.counts.credentials === 0;
   const first = (((state.ledger || {}).credentials) || []).flatMap((c) => c.assets || [])[0];
   if (first) { $('subject').value = first; query(first); }
 }).catch((err) => {

@@ -77,6 +77,21 @@ python3 verify.py ./delivery
 
 | 命令 | 做什么 |
 |---|---|
+## 三个角色（术语以 [docs/ROLES.md](docs/ROLES.md) 为准）
+
+| 角色 | 是什么 | 在哪跑 |
+|---|---|---|
+| **Agent 侧** | `ratchet` CLI + 传感器：观测、编译策略、出凭据、上报。**只读——不拦截任何调用** | 被管的机器（笔记本 / CI / 节点即宿主机的服务器） |
+| **控制面（server）** | `asas-api`：台账、复算验证、跨次比对、遏制记录、触达查询，以及自带控制台页面 | 集群里 |
+| **收货方** | 验证页或离线验证器：拿凭据自己验，不需要装东西、不需要控制面在线 | 客户/审计员那边 |
+
+CLI 的命令分两个面：**采集面**（`scan` / `deliver` / `chain` / `ingest` / `observe` / `policy` / `mcp`，本地、可完全离线）
+与 **台账面**（`reach` / `contain`，要连控制面）。
+
+## 命令
+
+| 命令 | 做什么 |
+|---|---|
 | `ratchet scan [--introspect --allow-exec] [--share page.html]` | 读 harness 配置列出 MCP server（只读，不执行）；加 `--introspect --allow-exec` 才连上去列工具（连上就会执行配置里的命令，所以要显式开） |
 | `ratchet ingest` / `observe` | 采集真实调用（hook 出错静默退出），并对照清单看出哪些工具从没被用过 |
 | `ratchet policy draft` / `check` | 编译三态策略（每条带判定依据），并试跑一次假设调用 |
