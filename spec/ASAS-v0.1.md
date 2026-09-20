@@ -186,6 +186,10 @@
 | **V4 `everyVerdictHasBasis`** | 每条 allow/approve/deny 都有非空 basis | 不合规 |
 | **V5 `allPinnedOrExempt`** | 每个 asset 已定版，或有未过期豁免 | 不合规 |
 | **V6 `silenceIsAuditable`** | 事件序号连续、前序哈希相符、与本地摘要一致 | 不合规 |
+| **V7 `withinValidityWindow`** | 凭据仍在有效期内（`subject.period.to`） | 凭据失效，必须重证（ASAS-6.5） |
+
+**变更即失效**：`asas-diff` 报出 critical / high 时，凭据视为失效——无论有效期是否到。
+这条把 ASAS-6.5 从"一条要求"变成"一条可自动执行的规则"。
 
 ## 7. 一致性测试向量（20 条）
 

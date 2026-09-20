@@ -59,10 +59,19 @@ def diff(old: dict, new: dict) -> list[dict]:
                                n["descHash"][:22] + "…", HIGH,
                                "描述或工具面变了：工具投毒/影子工具的观测点"))
         if o.get("version") != n.get("version"):
-            severity = HIGH if o.get("pinned") else MEDIUM
-            out.append(_change("version_changed", name, o.get("version"), n.get("version"),
-                               severity,
-                               "已定版组件不该变版本" if o.get("pinned") else "浮动引用的解析结果变了"))
+            # 消掉一类假阳性：上一轮只有引用（@latest），这一轮解析出了真实版本（1.9.0）——
+            # 那是"解析出了版本"，不是"版本变了"。实测跑真实凭据时这类假变化占了一半。
+            unresolved_before = o.get("version") == o.get("declaredRef")
+            resolved_after = n.get("version") != n.get("declaredRef")
+            if unresolved_before and resolved_after and o.get("declaredRef") == n.get("declaredRef"):
+                out.append(_change("version_resolved", name, o.get("declaredRef"),
+                                   n.get("version"), INFO,
+                                   "从引用解析出真实版本：不是变化，是信息变多了"))
+            else:
+                severity = HIGH if o.get("pinned") else MEDIUM
+                out.append(_change("version_changed", name, o.get("version"), n.get("version"),
+                                   severity,
+                                   "已定版组件不该变版本" if o.get("pinned") else "浮动引用的解析结果变了"))
         if o.get("pinned") is True and n.get("pinned") is False:
             out.append(_change("pin_removed", name, True, False, HIGH,
                                "从已定版退回未定版：下次启动可能换成别的产物"))

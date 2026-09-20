@@ -130,6 +130,9 @@ def build_attestation(
                 # 优先写**解析到的真实版本**（比配置里写的引用更有信息量）；
                 # 拿不到时退回被声明的引用，再拿不到才是 null。
                 "version": resolved_version or (facts.get(server, {}).get("ref") or None),
+                # 只在真有引用时输出：schema 里它是可选的字符串，
+                # 塞一个 null 进去等于用一个"空值"表达"没有"，没必要。
+                **({"declaredRef": ref} if ref else {}),
                 "pinned": facts.get(server, {}).get("pinned"),
                 # 书面豁免写进凭据本身（ASAS-3.1）
                 **({"exemptUntil": exemptions[server]} if server in exemptions else {}),

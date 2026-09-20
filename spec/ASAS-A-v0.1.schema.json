@@ -110,6 +110,10 @@
             "type": ["string", "null"],
             "description": "null = version not determined, which MUST appear in unknown[] (same rule as contentHash / pinned)."
           },
+          "declaredRef": {
+            "type": "string",
+            "description": "What the configuration actually says (e.g. 'chrome-devtools-mcp@latest'). Kept separate from `version` so a diff never mistakes 'resolved the reference' for 'the version changed' - that false positive was found by running the diff on real attestations."
+          },
           "pinned": {
             "type": ["boolean", "null"],
             "description": "ASAS-3.1. false requires exemptUntil. null means 'not determined' and MUST appear in unknown[] - a producer that cannot tell whether something is pinned must say so rather than guess."

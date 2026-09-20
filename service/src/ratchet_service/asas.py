@@ -66,6 +66,23 @@ class Report:
         }
 
 
+# ── V7 凭据在有效期内 ──────────────────────────────────────────────────────────
+def rule_within_validity_window(att: dict, now: datetime) -> RuleResult:
+    """ASAS-6.5：过期凭据视为无效。
+
+    没有这一条，"变更触发重证"就无从落地——凭据只要能一直拿出来用，
+    就没有任何人会去重新出证。
+    """
+    period = ((att.get("subject") or {}).get("period") or {})
+    expires = _parse_ts(str(period.get("to") or ""))
+    if expires is None:
+        return RuleResult("withinValidityWindow", FAIL, ["凭据没有可解析的有效期（subject.period.to）"])
+    if expires <= now:
+        return RuleResult("withinValidityWindow", FAIL,
+                          [f"凭据已于 {period.get('to')} 过期：必须重新出证"])
+    return RuleResult("withinValidityWindow", PASS, [])
+
+
 def _parse_ts(value: str) -> datetime | None:
     if not value:
         return None
@@ -251,6 +268,7 @@ def verify(
             rule_every_verdict_has_basis(attestation),
             rule_all_pinned_or_exempt(attestation, moment),
             rule_silence_auditable(events),
+            rule_within_validity_window(attestation, moment),
         ]
     )
 

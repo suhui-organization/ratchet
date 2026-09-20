@@ -1,0 +1,48 @@
+name: ASAS gate
+
+# 把"说不清 agent 能碰什么"变成一件在流程上过不去的事：
+# PR 里新增未定版组件、或制品哈希变了，这一步就变红。
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build
+        run: go build -o /tmp/ratchet ./cmd/ratchet
+
+      - name: Scan + compile policy + build attestation
+        run: |
+          set -euo pipefail
+          export PYTHONPATH="$PWD/service/src"
+          /tmp/ratchet deliver --out /tmp/asas --report-cmd "python3 -m ratchet_service.cli"
+
+      - name: Verify the attestation (offline, ASAS-V)
+        run: |
+          set -euo pipefail
+          export PYTHONPATH="$PWD/service/src"
+          python3 -m ratchet_service.cli verify /tmp/asas/delivery
+
+      - name: Diff against the committed baseline (ASAS-3.4)
+        run: |
+          set -euo pipefail
+          export PYTHONPATH="$PWD/service/src"
+          if [ -f spec/baseline-attestation.json ]; then
+            python3 -m ratchet_service.cli asas-diff spec/baseline-attestation.json \
+              /tmp/asas/delivery/attestation.json --fail-on high
+          else
+            echo "没有基线凭据：把 /tmp/asas/delivery/attestation.json 提交为 spec/baseline-attestation.json 后，这一步才会开始拦截"
+          fi
