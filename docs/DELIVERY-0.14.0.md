@@ -428,3 +428,9 @@ Claude Desktop 用户下载即装——**不需要 Smithery 做中间人**，还
 1. 定价页上"Buy the audit"被点了几次（Paddle 后台能看到 checkout 打开数）
 2. 有没有人走完 `scan` 之后接着跑 `policy draft`
 3. 第一个付费单——若 60 天没有，按 GTM 的结论停下来，不继续改产品
+
+### 养号进度 / 点对点回复（2026-09-20 09:30 档）
+
+- X：回复 @gaetanobyarobi（"AI agents now have a software supply chain: skill…"）——用本机实测数字回应（16 server / 12 未锁 / 164 工具），不带链接、不提产品名。
+- 搜索轮换关键词：MCP|agent × supply chain|unpinned|least privilege|tool poisoning（英文、排除回复、取最新）。
+- 本轮跳过：@Tank23x0（SecurityWeek 融资新闻）、@cv_usk（企业嵌入决策点，偏理论）、@MasterAlpha27（代币项目）。
