@@ -214,3 +214,54 @@ tmp       -> /tmp  readonly=
 | T16 | 委派链校验：子 agent 不得放大父 agent 的权限 | 构造一个放大权限的委派，被拒绝并给出依据 |
 | T17 | 遏制编排：`/contain` 记录 + "哪些 agent 曾触达 X" 可查 | 一条 CLI 命令能查出触达链路 |
 | T18 | 证据上传（让 `hashMatch` 在控制面可评估） | 控制面能重算哈希并与凭据里的值比对 |
+
+## 8. 复现这一次验收
+
+验收用的叠加值（**只是本机的路径与豁免，不是产品默认值**）。注意豁免写成 values
+文件而不是 `--set`——逗号在 `--set` 里是赋值分隔符（§3.6）：
+
+```yaml
+# /tmp/asas-sensor-local.yaml
+sensor:
+  enabled: true
+  schedule: "0 9 * * *"
+  org: kind-demo
+  hostScanPath: /var/asas-scan      # kind 节点里能看到的那棵树（见 §6.1）
+  scanHome: /scan
+  image:
+    tag: "0.1.0-1ca26f9"
+    digest: "sha256:bac7ff554ff1e72bff04d8af230bf490f896791e30655229e2a39aeac1759b38"
+  podSecurityContext:               # 宿主家目录属于 uid 1000，容器得用同一个身份读
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+  exempt: "chrome-devtools=2026-12-31,mcp-server-amap=2026-12-31,mcp-server-context7=2026-12-31,mcp-server-docker=2026-12-31,mcp-server-firecrawl=2026-12-31,mcp-server-gitee=2026-12-31,mcp-server-kubernetes=2026-12-31,mcp-server-memory=2026-12-31,mcp-server-playwright=2026-12-31,mcp-server-st=2026-12-31,superpowers=2026-12-31,xapi=2026-12-31"
+```
+
+```bash
+# 1) 真实 harness 配置进节点（kind 的节点是容器，宿主机家目录不在里面）
+docker exec desktop-control-plane mkdir -p /var/asas-scan
+docker cp <真实家目录的 .codex/.claude 等配置>/. desktop-control-plane:/var/asas-scan/
+docker exec desktop-control-plane chown -R 1000:1000 /var/asas-scan
+
+# 2) 拉取凭据（SWR 是私有的，401 就是缺这一步；本机 docker 已登录）
+python3 - <<'PY' | kubectl apply -f -
+import base64, json, os
+cfg = json.load(open(os.path.expanduser('~/.docker/config.json')))
+srv = 'swr.ap-southeast-3.myhuaweicloud.com'
+blob = base64.b64encode(json.dumps({"auths": {srv: {"auth": cfg["auths"][srv]["auth"]}}}).encode()).decode()
+print(f"apiVersion: v1\nkind: Secret\nmetadata:\n  name: swr-creds\n  namespace: asas\ntype: kubernetes.io/dockerconfigjson\ndata:\n  .dockerconfigjson: {blob}")
+PY
+
+# 3) 部署 + 立刻跑一趟（不等定时）
+helm upgrade --install asas deploy/k8s/helm/asas -n asas --create-namespace \
+  -f deploy/k8s/helm/asas/values-local.yaml -f /tmp/asas-sensor-local.yaml \
+  --set sensor.image.digest=sha256:bac7ff55… --set 'image.pullSecrets[0].name=swr-creds' --wait
+kubectl -n asas create job --from=cronjob/asas-sensor sensor-accept
+kubectl -n asas logs job/sensor-accept -f
+```
+
+**当前本机集群的状态**（留在那儿就能继续验）：`ns=asas` 里 `asas-api` 1/1 Running、
+PVC Bound、`asas-sensor` CronJob 每天 09:00（Asia/Shanghai）跑一趟。
+不想让它跑：`helm upgrade asas deploy/k8s/helm/asas -n asas -f deploy/k8s/helm/asas/values-local.yaml --set sensor.enabled=false`。
