@@ -1,0 +1,263 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asas.dev/schemas/ASAS-A-v0.1.schema.json",
+  "title": "Agent Security Assurance Attestation (ASAS-A) v0.1",
+  "description": "Draft specification. A machine-readable attestation that a third party can verify offline, with no network access and no trust in the issuer. Closed schemas are deliberate: `additionalProperties: false` is what makes 'no argument values' and 'unknown must be declared' enforceable by a validator instead of by promise.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "asas",
+    "subject",
+    "agents",
+    "assets",
+    "verdicts",
+    "unknown",
+    "observations",
+    "boundaries",
+    "manifest"
+  ],
+  "properties": {
+    "asas": {
+      "const": "0.1",
+      "description": "Spec version this attestation conforms to."
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["org", "period"],
+      "properties": {
+        "org": { "type": "string", "minLength": 1 },
+        "environment": { "type": "string", "description": "prod / staging / a named fleet; free text but must be present when the org has more than one." },
+        "period": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["from", "to"],
+          "properties": {
+            "from": { "type": "string", "format": "date-time" },
+            "to": { "type": "string", "format": "date-time" }
+          }
+        },
+        "scope": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "What was in scope (e.g. 'all Codex agents on macOS laptops'). Readers must not infer coverage beyond this list."
+        }
+      }
+    },
+    "agents": {
+      "type": "array",
+      "description": "ASAS-1.1. Every agent that was in scope MUST appear here.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "owner", "runtime", "identity"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "owner": {
+            "type": "string",
+            "minLength": 1,
+            "description": "ASAS-1.1. A named human responsible for this agent. 'platform team' is not a person."
+          },
+          "registered": { "type": "boolean", "description": "ASAS-1.2/1.3. false = shadow agent; it MUST also be listed as restricted in boundaries." },
+          "runtime": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "version"],
+            "properties": {
+              "kind": { "type": "string", "description": "e.g. codex, claude-code, cursor, custom" },
+              "version": { "type": "string" },
+              "model": { "type": "string" }
+            }
+          },
+          "identity": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type", "shared"],
+            "properties": {
+              "type": { "type": "string", "description": "e.g. service-account, user-delegated, oauth-app" },
+              "shared": {
+                "type": "boolean",
+                "description": "ASAS-1.4. true = more than one agent uses this credential, which MUST be reported as a violation."
+              },
+              "rotatedAt": { "type": "string", "format": "date-time" }
+            }
+          },
+          "delegation": {
+            "type": "object",
+            "description": "ASAS-2.4/2.5. Present only when this agent received permissions from another agent.",
+            "additionalProperties": false,
+            "required": ["from", "scope", "expires"],
+            "properties": {
+              "from": { "type": "string", "description": "agent id that granted the delegation" },
+              "scope": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+              "expires": { "type": "string", "format": "date-time" }
+            }
+          }
+        }
+      }
+    },
+    "assets": {
+      "type": "array",
+      "description": "ASAS-3. External components the agents can reach.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "name", "pinned", "contentHash"],
+        "properties": {
+          "kind": { "enum": ["server", "skill", "plugin", "tool"] },
+          "name": { "type": "string", "minLength": 1 },
+          "version": { "type": "string" },
+          "pinned": { "type": "boolean", "description": "ASAS-3.1. false requires exemptUntil." },
+          "exemptUntil": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ASAS-3.1. A written exemption with an expiry date. Open-ended exemptions are not conformant."
+          },
+          "contentHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+          "descHash": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "description": "ASAS-3.3. Hash of the tool description + schema. Tracked separately from contentHash so description-level tampering is visible even when the artifact is unchanged."
+          },
+          "reachableTools": { "type": "integer", "minimum": 0 }
+        },
+        "allOf": [
+          {
+            "if": { "properties": { "pinned": { "const": false } }, "required": ["pinned"] },
+            "then": { "required": ["exemptUntil"] }
+          }
+        ]
+      }
+    },
+    "verdicts": {
+      "type": "array",
+      "description": "ASAS-2.2. Every decision carries the reason it was made. A verdict without a basis is not conformant, and a validator can enforce that.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["agent", "asset", "decision", "basis"],
+        "properties": {
+          "agent": { "type": "string" },
+          "asset": { "type": "string" },
+          "decision": { "enum": ["allow", "approve", "deny"] },
+          "basis": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The literal reason: matched rule, matched keyword, or 'observed N times'. Empty or 'n/a' is not conformant."
+          }
+        }
+      }
+    },
+    "unknown": {
+      "type": "array",
+      "description": "ASAS-3.5. Enumerated failures MUST be declared here. An empty array is allowed; omitting the field is not. Hiding unknowns is attestation fraud.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["what", "why", "discoveredAt"],
+        "properties": {
+          "what": { "type": "string", "minLength": 1 },
+          "why": { "type": "string", "minLength": 1 },
+          "discoveredAt": { "type": "string", "format": "date-time" }
+        }
+      }
+    },
+    "observations": {
+      "type": "array",
+      "description": "ASAS-5.1/5.2. Tool-level counts only. The closed schema is what enforces 'never record argument values': there is no field to put them in.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["tool", "count"],
+        "properties": {
+          "tool": { "type": "string" },
+          "count": { "type": "integer", "minimum": 0 },
+          "firstSeen": { "type": "string", "format": "date-time" },
+          "lastSeen": { "type": "string", "format": "date-time" },
+          "argKeys": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Names of the arguments used. Values MUST NOT appear anywhere in this document."
+          }
+        }
+      }
+    },
+    "boundaries": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "revocationMinutes"],
+      "properties": {
+        "mode": {
+          "enum": ["enforce", "readonly"],
+          "description": "ASAS-4.1. 'readonly' is a legitimate answer and MUST be declared rather than implied."
+        },
+        "revocationMinutes": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "ASAS-8.1. How long it takes to revoke all permissions of one agent."
+        },
+        "approvalPath": { "type": "string", "description": "ASAS-4.2. Who approves high-risk actions." }
+      }
+    },
+    "signals": {
+      "type": "array",
+      "description": "S1-S6 counts. Metadata only: no payloads, no prompts, no tool arguments.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["class", "count", "severity"],
+        "properties": {
+          "class": { "enum": ["s1-supply-chain", "s2-permission", "s3-injection", "s4-runtime", "s5-credential", "s6-incident"] },
+          "count": { "type": "integer", "minimum": 0 },
+          "severity": { "enum": ["info", "low", "medium", "high", "critical"] },
+          "summary": { "type": "string" }
+        }
+      }
+    },
+    "compliance": {
+      "type": "object",
+      "description": "ASAS-7.2. Maps evidence to framework clauses. Claiming compliance is explicitly out of scope.",
+      "additionalProperties": false,
+      "properties": {
+        "eu_ai_act": { "type": "array", "items": { "type": "string" } },
+        "iso42001": { "type": "array", "items": { "type": "string" } },
+        "soc2": { "type": "array", "items": { "type": "string" } },
+        "nist_ai_rmf": { "type": "array", "items": { "type": "string" } },
+        "statement": { "const": "Supports evidence for the listed requirements. Does not assert compliance." }
+      }
+    },
+    "manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidence", "generatedAt", "generator"],
+      "properties": {
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["file", "sha256"],
+            "properties": {
+              "file": { "type": "string" },
+              "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+            }
+          }
+        },
+        "generatedAt": { "type": "string", "format": "date-time" },
+        "generator": { "type": "string" }
+      }
+    },
+    "signature": {
+      "type": "object",
+      "description": "ASAS-6.4. Optional. Signature MUST NOT be a prerequisite for verification.",
+      "additionalProperties": false,
+      "required": ["alg", "keyId", "value"],
+      "properties": {
+        "alg": { "type": "string" },
+        "keyId": { "type": "string" },
+        "value": { "type": "string" }
+      }
+    }
+  }
+}
