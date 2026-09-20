@@ -145,6 +145,7 @@ error from registry: Invalid image, fail to parse 'manifest.json'
 | `sensor.sh` 传了 `--org` | `deliver` 没有这个 flag（只有 `--client`），容器 exit 2 | 用例锁住"脚本用的 flag 必须真存在" |
 | `api.persistence.enabled` 是个开关 | 模板从不读它，关掉照样渲染 PVC 并挂载 | 模板真的读它；关掉走 emptyDir（有用例） |
 | `--set sensor.exempt="a=1,b=2"` 配了俩豁免 | Helm 用逗号分隔赋值：只生效第一项，其余变成垃圾顶层键 | `templates/values-guard.yaml` 渲染期直接 fail 并说明怎么改 |
+| `values-remote.yaml` 里写了 sensor 镜像 tag | 写在了 `image.sensor` 下，而模板读 `sensor.image`：渲染/部署都成功，用的是占位 tag | 引用写对位置；用例改成"values 里的 tag 与 digest 必须真的进模板" |
 
 ## 4. P2 判据逐条对照
 

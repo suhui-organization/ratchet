@@ -153,3 +153,27 @@ def test_comma_spliced_values_fail_loudly_instead_of_half_applying():
     )
     assert out.returncode != 0, "被截断的值不该安静地渲染过去"
     assert "未知的顶层值" in out.stderr
+
+
+@requires_helm
+def test_image_refs_in_values_files_actually_reach_the_templates():
+    """values 里写了的镜像引用，必须真的出现在渲染结果里。
+
+    实测踩过：把远程的 sensor tag 写在 `image.sensor` 下，而模板读的是
+    `sensor.image`——渲染成功、部署成功、用的是一个占位 tag。
+    """
+    remote = (CHART / "values-remote.yaml").read_text(encoding="utf-8")
+    digests = re.findall(r'digest:\s*"([^"]+)"', remote)
+    tags = re.findall(r'tag:\s*"([^"]+)"', remote)
+    assert digests and tags, "values-remote.yaml 里应当同时有 tag 与 digest"
+
+    # 有 digest 时用 repo@digest：tag 不该出现（同一个 tag 可以被推成另一个镜像）。
+    pinned = _render("-f", str(CHART / "values-remote.yaml"), "--set", "sensor.enabled=true")
+    for ref in digests:
+        assert ref in pinned, f"values 里的 digest 没进模板：{ref}"
+
+    # 去掉 digest 才能验证 tag 那条路径也被真的读过（这才是踩过的那个坑）。
+    by_tag = _render("-f", str(CHART / "values-remote.yaml"),
+                     "--set", "sensor.enabled=true", "--set", "sensor.image.digest=")
+    for ref in tags:
+        assert ref in by_tag, f"values 里的 tag 没进模板：{ref}"

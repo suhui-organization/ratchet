@@ -10,3 +10,12 @@ api:
   replicaCount: 1
   serviceType: NodePort
   nodePort: 30100
+
+# 传感器镜像引用。写在这里是因为这一份文件是"镜像 tag 的单一事实源"。
+# 部署时应优先用 digest（同一个 tag 可以被推成另一个镜像，digest 不会；
+# 见 docs/DELIVERY-0.16.0.md §3.5）。sensor.enabled 仍然是 false——
+# 传感器该跑在有 agent 的那台机器上，集群内定时采集只在节点就是宿主机时成立。
+sensor:
+  image:
+    tag: "0.1.0-1ca26f9"
+    digest: "sha256:bac7ff554ff1e72bff04d8af230bf490f896791e30655229e2a39aeac1759b38"
