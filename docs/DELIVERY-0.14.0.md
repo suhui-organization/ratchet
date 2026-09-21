@@ -593,3 +593,42 @@ Claude Desktop 用户下载即装——**不需要 Smithery 做中间人**，还
 
 **HN：本轮不发** —— 今日 1 条额度已于 09:30 用掉；Algolia 按日期查 `MCP security` / `agent permissions`
 命中的全是 0 评论的 Show HN（最晚 09-20），没有活讨论可参与。
+
+### 养号进度 / 点对点回复（2026-09-21 21:30 档）
+
+**X：本轮 3 条**（本轮把"长度护栏"做进了脚本：先备 2 条草稿，取第一条 ≤278 字符的，
+再查 `isEnabled()`——两次超长（356 / 297）按钮都静默变灰，都被拦下了）
+
+1. **@SelectionLab**（"WHO AUTHORIZED THE AGENT?"：光有凭证与权限还不够，要知道 agent 被授权做什么、在什么条件下、代表谁）：243 字符，已发。
+   角度："代表谁"这一半在实践中通常是断的——凭证说的是"谁"，配置说的是"能碰到什么"，两者存在不同地方；
+   本机 16 MCP server / 12 未锁 / 164 工具可达，全在同一个身份下。反问：授权面是身份事实，还是每次动作重算。
+2. **@himanshu231204**（"对编码 agent 来说最大的安全问题不是模型多聪明，而是 agent 能碰到什么"）：261 字符，已发。
+   角度：同意，而且可以量出来——本机 16/12/164，都在一个身份下，还没算上后面再加的 SSH 与云凭证；
+   这更像清单问题而不是模型问题。反问：按 agent 限定还是按任务。
+3. **@loftyarcher**（"默认放行的工具目录是身份缺陷"；新连上的 server 应当从零写/花/部署开始，逐个由具名责任人授权）：249 字符，已发。
+   角度：默认放行是最安静的那种问题——目录长得像清单，其实是权限表；本机连上就是 16/12/164。反问：检查只在连接时跑，还是每次目录变化都跑。
+
+**跳过**：@kevin_parker_ai、@travistuan、@GemHunterAI（项目/代币）、@windowsforum、@Team_Thor_AI、
+@rapidcanvas（新闻转述）、@MannaCodeAI（产品帖）、@Tank23x0（新闻转播，连续三天同款）。
+
+**HN：本轮 1 条（今日 2/2 用满）**
+
+- 帖子：`item?id=49775481` **BragJack attacks hijack AI browser agents through malicious extensions**（2 分、未被 flag）。
+- 评论（已发，`.comtr` = 1，正文可见）：扩展是**清单里永远不会出现的那部分可达面**——agent 能调用它从没被授予的东西，
+  因为浏览器/IDE 里另一个组件能；本机 MCP 侧单独就有 16/12/164，已经超出任何单个配置文件能描述的范围，而没有任何一条覆盖浏览器扩展。
+  反问：这个载荷是通过 DOM 还是消息通道到达 agent 的。
+
+**Reddit：第 2 条评论（渠道已稳定可用，继续走 old.reddit）**
+
+- 帖子：`old.reddit.com/r/mcp/comments/1wlix2u/`（"Google Ads has no read-only permission, so my MCP server writes the changes to a file instead"）
+- 评论（已发，`.commentarea .comment` 5 → 6，正文可见）：提案文件这个模式我认同——它把"可以提议"变成**可以 diff、可以批准的产物**，
+  而不是一个你希望它成立的权限；MCP 侧同样的缺口表现为未锁的 server（本机 16/12/164），只读意图在源头就不可强制。
+  反问：应用前是否把提案文件与线上状态做 diff，还是直接照单执行。
+- 方法沿用上一轮验证过的路径：`old.reddit.com` → `textarea[name="text"]` → `save`，一次成功。
+
+**本轮两个操作细节（写下来省下一次踩坑）**
+
+1. X 草稿超 280 字符时**按钮变灰但不报错**：本轮 356 / 297 两版都被拦下，靠 `isEnabled()` 发现；
+   现在脚本改成"给两条草稿、取 ≤278 的那条"，再校验 `isEnabled()`。
+2. X 详情页的 reply 按钮偶发点击超时（元素可见、未禁用，但 Playwright 判定动作失败）：
+   加 `domcontentloaded` + 2.5s 等待，失败后 `force: true` 重试一次即成功。
