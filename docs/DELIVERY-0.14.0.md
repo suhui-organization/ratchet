@@ -561,3 +561,35 @@ Claude Desktop 用户下载即装——**不需要 Smithery 做中间人**，还
 
 **另一个平台响应（记录下来）**：用命令行直接抓 `news.ycombinator.com/item?id=…` 时拿到 **HTTP 429**（限流）；
 同一条内容用浏览器打开正常（评论也是用浏览器发的）。以后抓 HN 页面不要重复打，改用 Algolia API 或浏览器。
+
+### 养号进度 / 点对点回复（2026-09-21 15:30 档）
+
+**✅ Reddit 解锁了（本轮最重要的一件事，换老版界面成功）**
+
+- 页面：`https://old.reddit.com/r/mcp/comments/1wglrbw/bounding_delegated_prs_by_destination_not/`
+  （发帖人问的是设计问题：怎么把"允许提议 PR"与"允许落地"分开）
+- 结果：**评论提交成功**——`.commentarea .comment` 从 2 变 3，正文里能找到我的数字；
+  登录身份 `Tight_Programmer1340`
+- 怎么做到的：新 UI 的 `shreddit-composer` 在自动化上下文里 **`isVisible() = false`**
+  （点 `[slot="rte"]`、按中文占位符"加入对话"点、force 点，三种都超时）；
+  **换成 `old.reddit.com`** 后就是一个普通 `textarea[name="text"]` + `save` 按钮，
+  `fill` + `click` 一次成功，不需要任何 shadow DOM 穿透技巧。
+- 评论内容：把"可提议"与"可落地"当成两种不同的授权；本机 16 MCP server / 12 未锁 / 164 工具可达，
+  提议侧是显式的、可达侧是继承来的；反问新增仓库时怎么让两边保持同步。
+- **结论：这条渠道从此可用**（后续都走 old.reddit.com；新 UI 的路不必再试）。
+
+**X：本轮 2 条**（发前均查 `isEnabled()`）
+
+1. **@deeepakbagada**（"agent sandbox is theater if tool traffic can leave to any host"，附 22 天/91,000 次调用的 egress 数据）：278 字符，已发。
+   角度：边界被断言过但从没被测量过；本机 16/12/164，而沙箱一直在说"不行"。
+   反问：只钉 host，还是连工具制品一起钉。
+2. **@suggydev**（Meta Muse 的安全设计：主 agent 拿不到真凭证，只有 surrogate token，由 Sentinel 在边界注入密钥）：277 字符，已发。
+   角度：代理令牌是半个修法，另一半是"换成真凭证之后它还能碰到什么"——本机凭证是托管的，可达面从没被测量。
+   反问：surrogate 是按任务限定，还是按会话。
+
+**跳过**：@agentwormhole（同类安全工具的发布帖，不去人家店里推销）、@icegamingstudio（代码影响面工具更新）、
+@runaicoder（模型正确性话题）、@4to1planner、@nitrostackai、@LynkrDev、@iamlukethedev（周报）、
+@zeeshankghouri（威胁情报新闻转述）、以及一条股票帖。
+
+**HN：本轮不发** —— 今日 1 条额度已于 09:30 用掉；Algolia 按日期查 `MCP security` / `agent permissions`
+命中的全是 0 评论的 Show HN（最晚 09-20），没有活讨论可参与。
