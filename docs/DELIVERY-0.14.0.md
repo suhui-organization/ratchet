@@ -520,3 +520,44 @@ Claude Desktop 用户下载即装——**不需要 Smithery 做中间人**，还
 3. Reddit 的 shadow-DOM 点击**这轮仍未能验证**（没有值得回的帖）。
    方法上仍认为可行（Playwright locator 会穿透 shadow DOM），留到有真讨论帖时再试，
    在此之前不要把渠道状态写成"已解锁"。
+
+### 养号进度 / 点对点回复（2026-09-21 09:30 档）
+
+**X：本轮 2 条**（发前都查 `isEnabled()`，并把输入框字数与按钮状态一起断言）
+
+1. **@basit_raza11**（在 Go 里写 SQLite MCP server：只读强制、查询超时、结果上限）：276 字符，已发。
+   角度：只读是"声明"，在被别人复核之前不算数——本机 12/16 未锁、164 工具可达，而每份配置看着都像被限定过。
+   反问：真正兜住这条线的是 SQLite 层（ATTACH/PRAGMA）还是 MCP 层的参数检查。
+   （作者在活跃回评，我的回复进了讨论串。）
+2. **@navtechai**（在 Swarms 的 MCP Deployer 帖子下提问："多个 host 打同一个 swarm 时，auth 层怎么处理 per-caller 的工具权限"）：274 字符，已发。
+   角度：auth 层回答的是"调用者是谁"，更难的一半是"这个工具随后能碰到什么"；
+   本机 per-caller 作用域是有的，blast radius 从没被测量过。反问：按调用者在 MCP 层限定，还是压到每个 server 里。
+
+**跳过**：@Tank23x0（arXiv 新闻转播，反复刷同一句口号）、@naveenpandey27（新闻转述）、
+@MasterAlpha27（代币）、@arunsingh_I（自荐 + SEO）、@RahulSain714（**昨天已回过同一条**，一帖只回一次）。
+
+**HN：本轮 1 条**（今日额度 2，剩 1）
+
+- 帖子：`item?id=49766312` **Show HN: Fentaris, an open-source proxy for managing multiple MCP servers**（4 分、0 评论、未被 flag）。
+- 评论（已发，页面上可见 `comments: 1`）：讲代理能看见什么、看不见什么——
+  "网关对**经过它**的流量给出真实可观测性（鉴权、策略、一处看调用）；我反复撞上的是**不经过它**的那部分：
+  一台开发机上 16 个 MCP server 分散在四个客户端里，12 个未锁版本，164 个工具可达，
+  在所有客户端都被指过去之前，代理一个都看不见。"结尾问：客户端侧的 server 是当作用域外并如实上报，还是尝试检测并阻断。
+- **未选**：`item?id=49744398`（Show HN: Linting 216 public Claude Code skills）**已被 flag**，在死帖上评论没有意义，跳过。
+
+**Reddit：仍然发不出去（本轮把失败特征定位得更准了）**
+
+- 找到两条真讨论帖，但都排除：`1whgd6g`（Auditing your MCP tool code for guard bypasses）**作者自己声明是自家产品**，
+  按"不去同类 vendor 的店里推销"跳过；`1wglrbw`（Bounding delegated PRs by destination）是**真讨论**，
+  于是拿它做本轮验证。
+- 失败特征（逐字）：
+  1. `[contenteditable="true"]`（在 `shreddit-composer` 里）`matchCount: 1`，但 **`visibleCount: 0`**
+     ——元素存在、不可见，说明评论框还处于"未展开"状态；
+  2. 点 `shreddit-composer [slot="rte"]` → `Playwright selector deadline exceeded … no_visible_match … visibleCount: 0`；
+  3. Reddit 新 UI 是**中文**（占位符是"加入对话"），此前按英文占位符（"Join the conversation"）找触发点必然扑空——
+     这是上一轮没定位到的原因之一。
+- 结论：**仍未解锁**，但阻塞点从"按钮在 shadow DOM 里"精确到"**评论框的展开触发器在 shadow root 内，现有 API 够不到**"。
+  按纪律不再在同一轮反复试。
+
+**另一个平台响应（记录下来）**：用命令行直接抓 `news.ycombinator.com/item?id=…` 时拿到 **HTTP 429**（限流）；
+同一条内容用浏览器打开正常（评论也是用浏览器发的）。以后抓 HN 页面不要重复打，改用 Algolia API 或浏览器。
