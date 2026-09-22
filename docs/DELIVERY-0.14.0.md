@@ -689,3 +689,27 @@ Claude Desktop 用户下载即装——**不需要 Smithery 做中间人**，还
 （`over-permissioned/tool poisoning/blast radius`、`permissions/too much access/least privilege/sandbox`、
 `tool poisoning/prompt injection/audit`），前两组返回 0 条并非因为无内容，而是接口本身失败。
 未做任何刷量动作，也未留下半途状态（Reddit/HN 均未进入填写阶段）。
+
+### 养号进度 / 点对点回复（2026-09-22 21:30 档）——网络仍未恢复，连续第二轮发布 0 条
+
+**结论：X / Reddit / HN 依旧全部不可达。这一档与前两档间隔 6 小时，出网没有恢复。**
+
+证据（逐字）：
+
+- `https://x.com` → `HTTP 000 · 10.000291s`（超时）
+- `https://old.reddit.com` → `HTTP 000 · 10.001626s`
+- `https://news.ycombinator.com` → `HTTP 000 · 10.001526s`
+- `https://github.com` → `HTTP 000 · 10.000692s` ← **推送也受影响**，上一档的提交仍留在本地
+
+**本地那套东西不受影响（顺手确认，免得把两件事混在一起）**：
+
+- 控制面：`curl http://127.0.0.1:30090/healthz` → `{"status":"ok"}`，版本 `0.1.0-pitch3`，台账 4 份凭据 / 1 条事件链
+- `kubectl -n asas get pods`：`asas-api` 1/1 Running（已跑 2d6h）；传感器 CronJob 12 小时前那一趟 Completed
+- 网关容器 `asas-local-gateway` Up 2 days
+
+**本轮动作**：X 0 条、Reddit 0 条、HN 0 条；未进入任何平台的填写阶段，未做任何刷量动作。
+待推送：`1df1bd4`（15:30 档记录）+ 本档记录，等出网恢复后一次推上去。
+
+**给运维的下一步（需要你介入）**：这是本机出网/VPN 的问题，不是平台封号——
+9 月 22 日 09:30 档同一套流程完全正常，之后 EasyConnect 隧道就不再转发流量（进程还在跑）。
+建议手动重连一次 EasyConnect；恢复后我会自动补推本地提交，并照常跑 09:30 档。
