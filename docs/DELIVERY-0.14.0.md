@@ -661,3 +661,31 @@ Claude Desktop 用户下载即装——**不需要 Smithery 做中间人**，还
    该帖已有的观点集中在"上集中式网关"，其中一条说"服务器有多少，只有把网关放到前面之后才知道"。
    我只补别人没说的那一点：**不用等网关**——客户端配置本身就是地面真相，本机不需要部署任何东西就读出 16/12/164；
    网关让这件事变得可强制、可集中，而配置告诉你这个面**存在**。并补一句反例：手工维护登记表，一周内必然漂移。
+
+### 养号进度 / 点对点回复（2026-09-22 15:30 档）——**本轮三渠道全被网络阻断**
+
+**结论：X / Reddit / HN 全部不可达，本轮发布数为 0。这不是"没有值得回的帖"，是网络层断了。**
+
+证据（逐字）：
+
+1. 浏览器里 X 的**页面级错误**：`Something went wrong. Try reloading.`（带 Retry 按钮；点 Retry 无效，整页 reload 后错误消失但仍无内容）。
+2. X 自己的 API 调用在控制台报错（HTTP-0 = 请求在网络层就没完成）：
+   - `n: ApiError: https://api.x.com/1.1/account/settings.json HTTP-0 codes:[1004]`
+   - `n: ApiError: https://x.com/i/api/graphql/og4a4SdSF3WiQkkwaPCdPg/HomeTimeline HTTP-0 codes:[1004]`
+   - `n: ApiError: https://x.com/i/api/graphql/1C9qXYjxcujNpyJWE6tAeg/PinnedTimelines HTTP-0 codes:[1004]`
+   症状面：搜索时间线、首页、状态页**都不再渲染任何 `article`**；侧边栏仍显示 @WaldenWuwei（登录态没掉），页面外壳能加载（静态资源来自 abs.twimg.com），**只有 `x.com/i/api/*` 这类接口请求失败**。
+3. 宿主机 curl 复核（同一次网络状态，两次间隔 20 秒结果一致）：
+   - `https://x.com` → `HTTP 000`（12s 超时）
+   - `https://api.x.com/1.1/account/settings.json` → `HTTP 000`
+   - `https://old.reddit.com` → `HTTP 000`
+   - `https://news.ycombinator.com` → `HTTP 000`
+   - `https://hn.algolia.com` → **`HTTP 200`（1.2s）** ← 不被墙的站点正常
+4. 代理/VPN 迹象：`EasyConnect` 进程在跑（`/usr/share/sangfor/EasyConnect/EasyConnect`，PID 3345326 等），但上述站点全部超时——**隧道没在转发流量**（或当前接入的网络不路由这些站点）。
+
+**判断**：这是**本机出网/VPN 的问题**，不是平台封号、也不是查询没结果。
+对照：今天 09:30 档同一套流程全部正常（X 2 条 + Reddit 2 条都发出去了），中间隔了 6 小时。
+
+**本轮实际动作**：X 0 条、Reddit 0 条、HN 0 条（均因不可达）；搜索关键词轮换了三组
+（`over-permissioned/tool poisoning/blast radius`、`permissions/too much access/least privilege/sandbox`、
+`tool poisoning/prompt injection/audit`），前两组返回 0 条并非因为无内容，而是接口本身失败。
+未做任何刷量动作，也未留下半途状态（Reddit/HN 均未进入填写阶段）。
