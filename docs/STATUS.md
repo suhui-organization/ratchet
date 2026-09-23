@@ -131,6 +131,26 @@ ratchet deliver --out /tmp/v --home "$HOME" --client 客户名 \
 | 需求不存在 | 60 天 0 付费 | 按 GTM 止损线，拆成开源组件 |
 | 演示翻车 | 现场控制面不通 | 演示前跑 [DEMO-10MIN.md](DEMO-10MIN.md) 末尾的三条检查 |
 
+## 七之二、渠道可用性（推广侧，2026-09-23 记录）
+
+> 为什么写在这里：`docs/DELIVERY-0.14.0.md` 里从 09-22 15:30 起连续多档记录"0 条"。
+> 那不是"没有值得回的帖"，而是**本机没有给被墙站点用的出口**——两件事必须分开，
+> 否则读文档的人会误判成"内容运营停了"。
+
+| 渠道 | 状态 | 证据 |
+|---|---|---|
+| X（点对点回复） | ❌ 不可达 | 页面报 `Something went wrong. Try reloading.`；控制台 `x.com/i/api/*` → `HTTP-0 codes:[1004]`；宿主机 `curl https://x.com` → `HTTP 000`（10s 超时） |
+| Reddit（old.reddit.com 路径） | ❌ 不可达 | `curl https://old.reddit.com` → `HTTP 000`；浏览器导航挂住直到工具超时 |
+| HN（评论） | ❌ 不可达 | `curl https://news.ycombinator.com` → `HTTP 000` |
+| GitHub（推送代码/文档） | ⚠️ 时通时断 | `curl https://github.com` 有时 200、有时 000；推送偶尔需要重试 |
+
+**根因（2026-09-23 本机诊断）**：DNS 正常（`x.com → 172.66.0.227`），但 TCP connect 超时
+（`Trying 172.66.0.227:443...` → `timed out`）；`ss -ltnp` 里 1080/7890/8080/8118/10808/10809/20171
+**全无进程**；`gsettings org.gnome.system.proxy mode` = `'none'`；环境变量无 `http_proxy/https_proxy`；
+EasyConnect 的 `tun0 = 2.0.1.1/24` 只承载公司网段，`ip route get 172.66.0.227` → `via 192.168.88.2 dev ens33`。
+即：**当前没有任何通往被墙站点的代理/隧道**。恢复方式由运维决定（启动原来的代理程序，或切换
+EasyConnect 的模式）；恢复后推广档照常，不需要改任何产品代码。
+
 ## 八、下一步建议（按对"能交付"的影响排序）
 
 1. **A1 认证**——不做这个，server 只能自己用，B1/B3 也都无从谈起。
