@@ -151,6 +151,19 @@ EasyConnect 的 `tun0 = 2.0.1.1/24` 只承载公司网段，`ip route get 172.66
 即：**当前没有任何通往被墙站点的代理/隧道**。恢复方式由运维决定（启动原来的代理程序，或切换
 EasyConnect 的模式）；恢复后推广档照常，不需要改任何产品代码。
 
+**自检命令（出问题时先跑这四条，30 秒能定位）**：
+
+```bash
+for u in https://x.com https://old.reddit.com https://news.ycombinator.com https://github.com; do
+  printf '%-32s ' "$u"; curl -sS -o /dev/null --max-time 10 -w 'HTTP %{http_code}\n' "$u"; done
+ss -ltn | grep -E ':(1080|7890|8080|8118|10808|10809|20171)\b' || echo '没有任何本地代理在监听'
+gsettings get org.gnome.system.proxy mode          # 期望不是 'none'
+ip route get 1.1.1.1 | head -1                      # 看是不是走了 tun0；走 ens33 说明没走隧道
+```
+
+判读：四个站点**全部 000** → 出口没了（本档情形）；**只有被墙站点 000、GitHub 200** →
+普通外网正常、缺的是代理/隧道；**全部 200** → 渠道恢复，照常跑下一档。
+
 ## 八、下一步建议（按对"能交付"的影响排序）
 
 1. **A1 认证**——不做这个，server 只能自己用，B1/B3 也都无从谈起。

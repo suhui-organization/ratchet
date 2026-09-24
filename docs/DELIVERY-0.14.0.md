@@ -782,3 +782,11 @@ Claude Desktop 用户下载即装——**不需要 Smithery 做中间人**，还
 - 根因与 09-23 15:30 档一致：缺少通往这些站点的出口（诊断见 `docs/STATUS.md` 的「渠道可用性」一节）
 - 本轮 X 0 条、Reddit 0 条、HN 0 条；未进入任何平台填写阶段；未做任何刷量动作
 - 本地产品栈不受影响：控制面 `/healthz` ok，`asas-api` Deployment 正常
+
+### 养号进度 / 点对点回复（2026-09-24 15:30 档）——第 7 档仍不可达
+
+- `https://x.com` → `HTTP 000 · 10.001950s`；`https://old.reddit.com` → `HTTP 000 · 10.002653s`；
+  `https://news.ycombinator.com` → `HTTP 000 · 10.002127s`；`https://github.com` → `HTTP 200 · 1.497851s`
+- 本地代理端口：仍无任何监听。根因与证据见 `docs/STATUS.md` 的「渠道可用性」一节（本轮又补了自检命令与判读规则）
+- 顺手补推：`d673c36..8f88cdd`（09-24 09:30 档记录）已上远端
+- 本轮 X 0 条、Reddit 0 条、HN 0 条；未进入任何平台填写阶段；未做任何刷量动作
