@@ -25,9 +25,21 @@ export function isCheckoutConfigured(config: PaddleConfig | undefined): boolean 
   return Boolean(config && config.clientToken && config.priceId)
 }
 
-/** Paddle 只认 live / sandbox；写错时按 sandbox 处理，避免把测试单打到生产账号。 */
-export function environmentName(config: PaddleConfig): 'live' | 'sandbox' {
-  return config.environment === 'live' ? 'live' : 'sandbox'
+/**
+ * 我们配置里的环境名 → Paddle.js 认的环境名。
+ *
+ * 两边的词表不一样：配置里写 `live`（人也这么叫），而 Paddle.js v2 只认
+ * production / sandbox / staging / development / local。把 `live` 原样丢进去
+ * **不会报错**——它只在控制台打一行 `Unknown environment: "live"` 然后什么都不做，
+ * 靠 Paddle 的默认值（production）兜过去。看着没事，但这是"靠别人的默认值干活"：
+ * 默认值一改就静默换环境，而且买家打开控制台就能看到那行 warning。所以这里显式翻译。
+ *
+ * 只有明确写着 live / production 才走生产，其余（含写错）一律 sandbox：
+ * 宁可让测试单打不出去，也不要把测试单打到生产账号上。
+ */
+export function environmentName(config: PaddleConfig): 'production' | 'sandbox' {
+  const raw = (config.environment ?? '').trim().toLowerCase()
+  return raw === 'live' || raw === 'production' ? 'production' : 'sandbox'
 }
 
 function normalizeOrigin(origin: string): string {

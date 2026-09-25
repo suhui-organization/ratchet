@@ -56,5 +56,10 @@ related_targets: []
   品牌 + 版本 + 语言切换）；两张表在窄屏横向滚动（改成一份 DOM 的响应式网格）；
   `--muted`/`--faint` 低于 AA；主按钮 `bg-brand` 白字 4.33:1 → 改用 `--brand-ink`。
 - **后续补做**：法律条款页已双语（按译本处理，中文版带"以英文版本为准"声明）；
-  自定义错误页 `app/error.vue` 取代了 Nuxt 默认页（默认页缺 lang、对比度不达标、
-  返回链接热区不足 24px）。最终实测 17 条路由：对比度 0 失败、溢出 0、小目标 0。
+  自定义错误页取代了 Nuxt 默认页（默认页缺 lang、对比度不达标、返回链接热区不足 24px）。
+  最终实测 18 条路由 × 390/1440：对比度 0 失败、溢出 0、小目标 0、水合 18/18。
+- **错误页有两个入口，正文只有一份**（`app/components/ErrorPanel.vue`）：
+  `app/error.vue` 是 Nuxt 的错误边界（开发/SSR 用）；生产是静态产物，
+  nginx 的 `error_page 404` 指向预渲染出来的 `/not-found`、`/zh/not-found`。
+  之所以不能直接用 nitro 生成的 `404.html`：那是 SPA 兜底壳，客户端一启动就抛
+  `Cannot read properties of undefined (reading 'app')`，页面全白——实测过。

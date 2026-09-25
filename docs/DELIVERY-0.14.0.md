@@ -31,9 +31,15 @@ price 的金额一致。页面上写 1500、收银台收 2000，那是合规问�
 
 配套改动：
 
-- `deploy/docker/security-headers.inc`：CSP 放行 Paddle——`script-src cdn.paddle.com`、
+- `deploy/docker/security-headers.inc.in`：CSP 放行 Paddle——`script-src cdn.paddle.com`、
   `frame-src *.paddle.com`、`connect-src *.paddle.com`、`form-action *.paddle.com`。
   **少一条，收银台就静默打不开**，而且只在浏览器控制台报错。
+  同一份 CSP 还管着 Nuxt 写的内联脚本（运行时配置 + payload + importmap）：
+  `script-src 'self'` 不含 `'unsafe-inline'`，这些脚本会被拦掉，症状是整站不水合、
+  按钮点了没反应。所以构建期用 `render-security-headers.mjs` 按产物算出 sha256 逐个放行
+  （2026-09-26 修复；此前线上正是这个状态）。
+  另：`Environment.set()` 要传 Paddle 的词——配置写 `live`，交给它的是 `production`
+  （传 `live` 只会打一行 warning 然后什么都不做，靠默认值兜着）。
 - `web/app/pages/thanks.vue`：付完之后去哪。写清三件事——什么时候有人联系、交付物是什么、
   对方怎么用它自己的浏览器验证。买完落回首页是最容易让人后悔的一步。
 

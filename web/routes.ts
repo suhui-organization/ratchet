@@ -29,6 +29,9 @@ const PAGE_PATHS = [
   '/verify',
   // 支付成功页：没有站内入口，只能在这里登记，否则线上 404
   '/thanks',
+  // 静态产物下的 404 页本体：nginx 的 error_page 404 指向它。它不是给人点进来的，
+  // 但它必须是构建期生成好的真实文件——见 default.conf 里的说明。
+  '/not-found',
   // 法律文档：slug 必须与 app/content/legal.ts 里每份文档的 slug 一致
   '/legal/terms',
   '/legal/privacy',

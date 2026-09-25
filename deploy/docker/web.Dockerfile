@@ -30,13 +30,24 @@ RUN npm ci --no-audit --no-fund ${NPM_REGISTRY:+--registry=$NPM_REGISTRY} \
 COPY web/ ./
 RUN npm run generate
 
+# CSP 的脚本哈希必须在 generate **之后**算：Nuxt 往产物里写的内联 <script>
+# （运行时配置 + 路由 payload + importmap）带 buildId，每个版本都不一样。
+# 不生成这一步、或者是拿旧产物生成的，表现是"页面看起来完全正常但整站不水合"
+# ——收银台按钮点了没反应。详见 render-security-headers.mjs 顶部。
+COPY deploy/docker/security-headers.inc.in deploy/docker/render-security-headers.mjs /app/deploy/docker/
+RUN node /app/deploy/docker/render-security-headers.mjs \
+      /app/.output/public \
+      /app/deploy/docker/security-headers.inc.in \
+      /app/security-headers.inc
+
 FROM nginx:1.27-alpine
 
 # 必须覆盖镜像自带的 default.conf（名字也得叫这个，否则按字母序排在它后面就不生效）；
 # 头部片段用 .inc 而不是 .conf：conf.d/*.conf 会被主配置自动加载一遍，
 # 那相当于提前把 add_header 挂到 http 层，行为会变得不好预测。
 COPY deploy/docker/default.conf /etc/nginx/conf.d/default.conf
-COPY deploy/docker/security-headers.inc /etc/nginx/conf.d/security-headers.inc
+# 响应头用的是构建阶段按本次产物渲染出来的版本（脚本哈希在里面），不是仓库里那份模板。
+COPY --from=build /app/security-headers.inc /etc/nginx/conf.d/security-headers.inc
 COPY --from=build /app/.output/public /usr/share/nginx/html
 
 EXPOSE 80

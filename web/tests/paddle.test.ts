@@ -17,12 +17,17 @@ describe('isCheckoutConfigured', () => {
 })
 
 describe('environmentName', () => {
-  it('live 就是 live', () => {
-    expect(environmentName(live)).toBe('live')
+  it('配置写 live，交给 Paddle 的是 production（它不认 live 这个词）', () => {
+    expect(environmentName(live)).toBe('production')
+  })
+
+  it('写 production 也认（别只认我们自己造的词）', () => {
+    expect(environmentName({ ...live, environment: 'production' })).toBe('production')
+    expect(environmentName({ ...live, environment: ' LIVE ' })).toBe('production')
   })
 
   it('别的值一律落到 sandbox，避免测试单打到生产账号', () => {
-    expect(environmentName({ ...live, environment: 'production' })).toBe('sandbox')
+    expect(environmentName({ ...live, environment: 'sandbox' })).toBe('sandbox')
     expect(environmentName({ ...live, environment: '' })).toBe('sandbox')
   })
 })

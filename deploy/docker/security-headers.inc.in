@@ -1,0 +1,31 @@
+# 安全响应头：唯一定义处（deploy/docker/security-headers.inc.in）。
+#
+# 站点自托管字体与脚本，唯一的第三方是收银台 Paddle，所以 CSP 能收得很紧。
+# 内联样式只留给 Nuxt 产物的 <style>（Tailwind 产物里确实有）。
+#
+# **这是一个模板，不是最终文件。** 里面那个脚本哈希占位符由构建期替换成
+# Nuxt 产物里每个内联 <script> 的 sha256（见 render-security-headers.mjs）。
+# 本机想用仓库里的文件直接跑 nginx 时，先渲染一次：
+#   node deploy/docker/render-security-headers.mjs web/.output/public \
+#        deploy/docker/security-headers.inc.in /tmp/security-headers.inc
+#
+# 用法：server 块与每个自己写了 add_header 的 location 都要 include 一次——
+# nginx 的 add_header 不跨块叠加，漏 include 就等于把这一整组头丢掉了。
+#
+# 关于 Paddle 的那几个来源（少一个，收银台就静默打不开，且只在浏览器控制台报错）：
+#   script-src  cdn.paddle.com        Paddle.js 本体
+#   frame-src   *.paddle.com          收银台跑在 iframe 里
+#   connect-src *.paddle.com          Paddle.js 与 iframe 之间的通信
+#   form-action *.paddle.com          某些支付方式会提交表单
+#
+# 关于 __CSP_SCRIPT_HASHES__：Nuxt 会把「运行时配置 + 路由 payload」和一个
+# importmap 写成**内联** <script>，而 `script-src 'self'` 不含 'unsafe-inline'，
+# 于是这些内联脚本会被静默拦掉——表现不是页面白屏，而是**整站不水合**：
+# 收银台按钮点了没反应、/verify 的哈希算不出来，HTML 看起来却完全正常。
+# 实测踩过。所以这里按构建产物逐个列出 sha256，而不是放开 'unsafe-inline'：
+# 前者只放行"这几个确切的脚本"，后者等于对内联脚本不设防。
+add_header X-Content-Type-Options "nosniff" always;
+add_header X-Frame-Options "SAMEORIGIN" always;
+add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+add_header Content-Security-Policy "default-src 'self'; img-src 'self' data: https://*.paddle.com; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self' https://*.paddle.com; script-src 'self' https://cdn.paddle.com __CSP_SCRIPT_HASHES__; frame-src https://*.paddle.com; form-action 'self' https://*.paddle.com" always;
