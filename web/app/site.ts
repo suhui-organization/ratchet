@@ -27,12 +27,19 @@ export const site = {
    */
   installUrl: 'https://github.com/suhui-organization/ratchet/releases/latest/download',
   /**
-   * Claude Desktop 的 MCPB 一键安装包（同一个 release 里的附件）。
+   * Claude Desktop 的 MCPB 一键安装包（release 里的附件）。
    * 这是转化路径最短的一条：下载 → 打开 → 装好，不碰终端。
-   * 文件名带版本号，所以发新版时这里要跟着改（和上面 installUrl 同一批产物）。
+   *
+   * **为空与 downloadUrl 为空是同一个含义：页面不渲染这个入口**，
+   * 而不是给一个点了 404 的链接。一个讲证据的产品，首页上不能有一条
+   * 一点就断的承诺。
+   *
+   * 2026-09-25：v0.13.0 的 release 里**没有** mcpb 资产（`make dist` 出了四平台
+   * 二进制，但 `scripts/build-mcpb.sh` 没跑成）。所以这里留空。
+   * 把 `dist/ratchet-0.13.0.mcpb` 传到 release 之后，把 URL 填回来即可：
+   *   https://github.com/suhui-organization/ratchet/releases/latest/download/ratchet-0.13.0.mcpb
    */
-  desktopBundleUrl:
-    'https://github.com/suhui-organization/ratchet/releases/latest/download/ratchet-0.13.0.mcpb',
+  desktopBundleUrl: '',
   /** 无下载地址时的联系入口。 */
   contactUrl: 'mailto:iverson.wuwei@gmail.com?subject=Ratchet%20access',
   /** 页面上显示的联系邮箱（必须与 contactUrl 指向同一个信箱）。 */

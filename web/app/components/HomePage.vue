@@ -166,7 +166,9 @@ useHead(() => ({
           <NuxtLink :to="href('/guard')" class="py-1 text-brand-ink hover:underline">{{ t.nav.blocking }}</NuxtLink>
         </div>
 
-        <p class="mt-5 text-[13px] leading-relaxed text-faint">
+        <!-- 资产不存在时整段不渲染。理由与 site.desktopBundleUrl 的注释同：
+             宁可少一个入口，也不给一条点了就断的链接。 -->
+        <p v-if="site.desktopBundleUrl" class="mt-5 text-[13px] leading-relaxed text-faint">
           {{ t.home.install.onDesktop }}
           <a :href="site.desktopBundleUrl" class="py-1 text-brand-ink hover:underline">
             {{ t.home.cta.desktop }} ({{ site.version }}, .mcpb)
