@@ -30,6 +30,13 @@ RUN npm ci --no-audit --no-fund ${NPM_REGISTRY:+--registry=$NPM_REGISTRY} \
 COPY web/ ./
 RUN npm run generate
 
+# nitro 会顺手产出 200.html / 404.html 两个 SPA 兜底壳。在本项目的构建里这两个文件
+# 是**坏的**：客户端一启动就抛 Cannot read properties of undefined (reading 'app')，
+# 页面全白。站点用不到它们（404 走 /not-found 这个真实预渲染页，见 default.conf），
+# 所以直接从产物里删掉——别的东西（Vercel 之类的静态托管）也一样会按文件名自动捡起
+# 404.html 当兜底页，留着就是把空白页发给下一个宿主。
+RUN rm -f /app/.output/public/200.html /app/.output/public/404.html
+
 # CSP 的脚本哈希必须在 generate **之后**算：Nuxt 往产物里写的内联 <script>
 # （运行时配置 + 路由 payload + importmap）带 buildId，每个版本都不一样。
 # 不生成这一步、或者是拿旧产物生成的，表现是"页面看起来完全正常但整站不水合"
