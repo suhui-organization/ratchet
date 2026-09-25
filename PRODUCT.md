@@ -62,7 +62,9 @@ withinValidityWindow）。
 
 ## Brand Commitments
 
-* 名字：**Ratchet**。公开站点语言为英文，内部文档与 CLI 输出为中文。
+* 名字：**Ratchet**。**公开站点中英双语**（`/` 英文，`/zh` 中文，路径前缀区分，
+  两棵文案树同形状、由测试强制对齐）；内部文档与 CLI 输出为中文。
+  法律条款页只有英文：那是要承担法律责任的文本，翻译它需要法律意见。
 * **[用户明确要求]** 视觉上继承已上线的站点（`web/app/assets/css/main.css`）：
   浅色底、系统无衬线、代码用 JetBrains Mono、品牌色 `#4d6bfe`、`--color-ink:#202124`。
   新界面不另起一套视觉世界。

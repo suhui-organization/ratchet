@@ -21,8 +21,13 @@
 
   /* 取自参照页的实际用色（不是凭印象调的） */
   --color-ink: #202124;
-  --color-muted: #8691a1;
-  --color-faint: #9ca3af;
+  /* 次要文字与元信息：这两个值经过 WCAG AA 校验（见下方注释），
+     原先的 #8691a1 / #9ca3af 实测只有 3.19:1 / 2.54:1，正文远低于 4.5:1。
+     改回 DESIGN.md 早已记录的 #6b7280（4.83:1），并把正文色定为更深的 #5b6675，
+     这样 ink > muted > faint 三档层次保住，且两档都在白底与浅底上过 AA。
+     校验命令见 DESIGN.md 的 Palette 一节。 */
+  --color-muted: #5b6675; /* 白底 5.83:1 · 浅底 5.49:1 */
+  --color-faint: #6b7280; /* 白底 4.83:1 · 浅底 4.55:1 */
   --color-line: #e5e7eb;
   --color-brand: #4d6bfe;
   --color-brand-ink: #234792;
@@ -30,6 +35,11 @@
   --color-surface-2: #f7f8fa;
   --color-code: #121c31;
   --color-code-2: #1e232c;
+  /* DESIGN.md 早就记录了这两个语义色，但一直没落到 main.css 里——
+     verify 页因此自己找了 slate/red/emerald 顶上，成了全站唯一的例外。
+     补进来，把那一页拉回系统。对比度：白底 6.08:1 / 5.91:1。 */
+  --color-pass: #12704f;
+  --color-fail: #b23c17;
 }
 
 html {

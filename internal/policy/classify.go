@@ -132,6 +132,31 @@ func Classify(tool model.ToolObservation) (Capability, string) {
 	return cap, match.describe(LocaleZH)
 }
 
+// IsDestructiveToken 判断一个词元是不是破坏性动作。
+//
+// 执行点需要它：真正的破坏性常常不在工具名里，而在**参数**里——
+// `shell`、`Bash`、`run_command` 这些名字本身完全中性，
+// 危险的是它们要执行的那句 `rm -rf /srv/data`。
+//
+// 刻意复用同一份词表，而不是在执行点另建一张：两份词表一定会漂移，
+// 且漂移方向不可预测——某天同一句命令在策略里算"破坏性"、在执行点却不算，
+// 那条规则就静默失效了，而它看起来还在生效。
+func IsDestructiveToken(word string) bool {
+	_, ok := match([]string{strings.ToLower(strings.TrimSpace(word))}, destructiveWords)
+	return ok
+}
+
+// destructiveWords 是 keywordSets 里 CapDestructive 那一档。
+// 单独取出来，是为了让上面的判定不依赖 keywordSets 的排列顺序。
+var destructiveWords = func() []string {
+	for _, set := range keywordSets {
+		if set.cap == CapDestructive {
+			return set.words
+		}
+	}
+	return nil
+}()
+
 // Match 记录"依据是什么"：命中位置 + 命中的词（没命中时为空）。
 //
 // 不直接把依据拼成字符串，是因为产物要出中英两版——

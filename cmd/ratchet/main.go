@@ -50,6 +50,8 @@ func main() {
 		os.Exit(cmdObserve(os.Args[2:]))
 	case "ingest":
 		os.Exit(cmdIngest(os.Args[2:]))
+	case "guard":
+		os.Exit(cmdGuard(os.Args[2:]))
 	case "mcp":
 		// 以 stdio MCP server 运行（供 MCP 客户端与官方 Registry 收录）
 		mcpserver.ServerVersion = version // 版本号只认 main 里这一份，别在包里另写
@@ -103,6 +105,12 @@ func usage() {
                        [--lang en-US|zh-CN] [--json]
   ratchet policy check --policy <策略.json>    # 从 stdin 读一次调用试跑
 
+【执行点｜拦截，装在被管的机器上】
+  ratchet guard [--harness <名>]              # 作为 PreToolUse hook 运行：读一条调用，给放行/人工确认/拒绝
+  ratchet guard check [--policy <策略.json>]  # 拿一次具体调用试跑执行点（挂 hook 之前先确认不误拦）
+  ratchet guard install [--harness <名>] [--write] [--list] [--all]
+                                              # 打印（默认）或写入把执行点挂进某个 agent 的配置
+
 【台账面｜连控制面才能用】
   ratchet reach --api <控制面> --subject <资产> [--json]
   ratchet contain --api <控制面> --agent <id> [--reason "…"] [--dry-run|--yes]
@@ -135,6 +143,44 @@ func usage() {
 
                 Claude Code 的 MCP 工具名是 mcp__<server>__<tool>，会被拆成真实来源；
                 PermissionDenied 事件记为 deny/blocked——那是 agent **想做但被拦下**的事。
+
+  guard         执行点。作为 PreToolUse hook 运行：在工具**执行之前**判定这次调用，
+                输出 allow / ask / deny。纪律与 ingest 相反——ingest 永不阻塞，
+                guard 在判定为拒绝时必须真的拒绝。
+
+                判定顺序（前面的优先，且只会比策略更严，不会更松）：
+                  1. 命中受保护目标 → 拒绝（不可恢复的数据、凭据、生产目录、.git）
+                  2. 策略三态 → deny 拒绝 / approve 交人确认 / allow 放行
+                  3. 破坏性操作且目标不在安全清单内 → 至少要求人工确认
+
+                每次判定写进 $RATCHET_HOME/guard.jsonl：依据、命中项、参数值哈希、
+                以及**策略指纹**（证明按哪一版规则判的）。被拒的调用同时进调用记录，
+                于是自动进入可验证的事件链——那是 Ratchet 自己产生的 deny，不是转述。
+
+                策略读不出来时默认放行但告警并记录（不把客户锁在自己机器外）；
+                无人值守场景加 --fail-closed 让它直接拒绝。
+
+                支持的 agent（--harness 取值；用 ratchet guard install --list 看当前清单）：
+                  claude-code   Claude Code           PreToolUse
+                  codex         Codex CLI             PreToolUse
+                  codebuddy     CodeBuddy（腾讯云）    PreToolUse
+                  qwen-code     Qwen Code（阿里）      PreToolUse
+                  qoder         Qoder/通义灵码（阿里）  PreToolUse
+                  gemini-cli    Gemini CLI（Google）    BeforeTool
+                  antigravity   Antigravity CLI（Google） PreToolUse
+                  cursor        Cursor                  preToolUse
+                  crush         Crush（Charm）           PreToolUse
+                  factory-droid Factory Droid            PreToolUse
+                  cline         Cline                   PreToolUse
+                  opencode      OpenCode                tool.execute.before
+
+                输出纪律：**从不输出 allow**。
+                在多数 agent 上，返回 allow 的语义是"绕过权限系统直接执行"——
+                那等于替客户跳过他自己的确认。放行时保持沉默（退出码 0、不输出），
+                agent 的常规权限流程照常走。这样执行点在结构上只可能更严，不可能更松。
+
+                也不用退出码阻断：Gemini CLI 认退出码 2，但反重力的非零退出码
+                只写日志、不阻断；两家都认 stdout 上的 JSON。所以统一走"退出码 0 + JSON"。
 
   mcp           以 stdio MCP server 运行，暴露三个只读工具：
                 ratchet_scan / ratchet_policy / ratchet_check。

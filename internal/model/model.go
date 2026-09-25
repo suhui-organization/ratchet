@@ -96,6 +96,41 @@ type Policy struct {
 	NeedsReview []string `json:"needsReview"`
 	GeneratedAt string   `json:"generatedAt,omitempty"`
 	Generator   string   `json:"generator,omitempty"`
+	// Guard 是**执行点**的配置。
+	//
+	// 为什么和执行策略放在同一份文件里：如果"策略说该拒"和"执行点拦不拦"
+	// 是两份配置，它们就会漂移——最后变成一套说得漂亮、实际不生效的规则。
+	// 这正是本产品批评别人的那件事，自己不能犯。
+	Guard *Guard `json:"guard,omitempty"`
+}
+
+// Guard 决定执行点（PreToolUse 拦截）在没有人工在场时怎么办。
+//
+// 三态策略回答"该不该放行"；Guard 回答"拦到什么程度"。
+// 两者必须分开，因为执行点的失败代价是不对称的：
+// 放行一次删库是不可逆的，而误拦一次正常调用只是烦人。
+type Guard struct {
+	// Enabled 为 false 时执行点只记录不拦截（warn 模式）。
+	Enabled bool `json:"enabled"`
+	// OnApprove 是三态为 approve 时的动作：ask（默认，交给人确认）/ deny / allow。
+	OnApprove string `json:"onApprove,omitempty"`
+	// OnUnknown 是能力无法判定时的动作：deny（默认，fail-closed）/ ask / allow。
+	OnUnknown string `json:"onUnknown,omitempty"`
+	// Protected 是**不可恢复的目标**：备份、生产目录、数据目录、.git、版本历史。
+	// 参数值命中它、且这次调用会**写或删**时，直接拒绝。
+	//
+	// 只管写和删，不管读：agent 读一个 schema.sql 是正常干活，
+	// 拦掉读会让它什么都做不了——而客户关掉执行点之后保护强度归零。
+	Protected []string `json:"protected,omitempty"`
+	// Sensitive 是**凭据类目标**：.env、私钥、云凭证、kubeconfig。
+	// 参数值命中它时**任何操作都拒**，包括读——泄露和删除在这里同样不可逆。
+	//
+	// 口径与审计侧的 SensitivePathDeny 同源：同一个东西在策略里和在执行点
+	// 必须是同一套说法，否则会出现"策略里有这条、拦截时不认"的静默失效。
+	Sensitive []string `json:"sensitive,omitempty"`
+	// SafeTargets 是明确安全的破坏目标（如构建产物目录）。
+	// 命中它的破坏性调用不再升级为 ask——没有这一项，agent 什么都不能删，客户会直接关掉它。
+	SafeTargets []string `json:"safeTargets,omitempty"`
 }
 
 // Key 是工具在 Rationale / NeedsReview 里的键。

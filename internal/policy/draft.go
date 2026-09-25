@@ -185,6 +185,9 @@ func Draft(inv model.Inventory, opts Options) model.Policy {
 		NeedsReview:     needsReview,
 		GeneratedAt:     now.UTC().Format(time.RFC3339),
 		Generator:       Generator,
+		// 执行点配置随策略一起出厂：策略说"这些该拒"，执行点就有能力真的拒。
+		// 两者分家会让"我们拦住了"变成一句无法验证的话。
+		Guard: DefaultGuard(),
 	}
 }
 

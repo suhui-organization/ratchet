@@ -62,6 +62,13 @@ func looksLikePathValue(v string) bool {
 	return false
 }
 
+// MatchGlob 是路径 glob 匹配的**唯一实现**的对外入口。
+//
+// 执行点（guard）必须和策略判定用同一份匹配语义：如果拦截时用另一套规则，
+// 就会出现"策略里写着的拒绝，执行点认不出来"——那是最糟的一类漏洞，
+// 因为它看起来是被保护着的。
+func MatchGlob(pattern, value string) bool { return globMatch(pattern, value) }
+
 // globMatch 匹配路径模式。
 //
 // `**` 跨目录，`*` 不跨；用 path.Match 逐段比，避免手写正则。
