@@ -95,7 +95,8 @@ ratchet deliver --out /tmp/v --home "$HOME" --client 客户名 \
      实测确认修复后能点到 Paddle.js 真的去 `cdn.paddle.com` 取脚本。
 * 404 页是一条**真实预渲染路由**（`/not-found`、`/zh/not-found`），由 nginx `error_page 404` 指过去。
   nitro 顺手生成的 `404.html` 是 SPA 兜底壳，客户端一启动就抛异常、页面**全白**，
-  已从 nginx 里摘掉并显式挡掉。
+  构建期直接从产物里删掉，nginx 那边再挡一层（`/404` 与 `/200` 也能通过 `try_files` 的
+  `$uri.html` 命中它们，只手堵 `.html` 写法会漏——实测过，两次才收干净）。
 * 目标优先：锚点是"碰的是什么东西"而不是"用的哪个工具"——被标成 allow 的工具照样不能写受保护目标。
 * 两类目标分开：凭据类（读也拒）与不可恢复类（只在写或删时拒），合成一张会把 agent 废掉。
 * 破坏性藏在参数里也能认出：`shell` + `rm -rf /srv/pgdata` 会被拦。
