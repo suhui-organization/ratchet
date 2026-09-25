@@ -24,6 +24,9 @@ IMAGE_TAG="${1:-${VERSION}-$(git rev-parse --short HEAD)}"
 # 站点镜像必须推（k8s 里跑的就是它）；CLI/MCP 镜像默认也推，集群内起 MCP 服务时要用。
 CLI_PUSH="${CLI_PUSH:-1}"
 PLATFORM="${PLATFORM:-linux/amd64}"
+# npm 源。留空=官方源；在国内构建时必须换（实测取 npmjs.org 上一个 73KB 的包要 17s，
+# 一次 npm ci 会在某个 tarball 上稳定超时，加满重试也没用——不是抖动，是慢）。
+NPM_REGISTRY="${NPM_REGISTRY:-}"
 
 prefix="${SWR_REGISTRY}/${SWR_NAMESPACE}"
 
@@ -36,6 +39,7 @@ fi
 # 所以固定单平台 + 关掉 provenance/sbom。集群是 x86-64-v1，只发 amd64。
 echo "==> 构建站点镜像 ${prefix}/ratchet-web:${IMAGE_TAG}"
 docker build --provenance=false --sbom=false --platform "$PLATFORM" \
+  ${NPM_REGISTRY:+--build-arg NPM_REGISTRY="$NPM_REGISTRY"} \
   -f deploy/docker/web.Dockerfile -t "${prefix}/ratchet-web:${IMAGE_TAG}" .
 
 if [[ "$CLI_PUSH" == "1" ]]; then

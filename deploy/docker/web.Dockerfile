@@ -15,7 +15,18 @@ FROM node:22-alpine AS build
 WORKDIR /app
 # 先拷清单再拷源码：依赖没变时这一层命中缓存，发版只重跑 nuxt generate
 COPY web/package.json web/package-lock.json ./
-RUN npm ci --no-audit --no-fund
+# npm 源可换：这台机器在国内，实测取 registry.npmjs.org 上一个 73KB 的包要 17s，
+# 一次 npm ci 会在某个 tarball 上稳定超时（errno ETIMEDOUT @parcel/watcher-wasm），
+# 加满重试也没用——不是抖动，是慢。换国内镜像后同一个包 0.18s。
+# 默认不写死：在别处构建仍然走官方源；从这台机器发版时传
+#   --build-arg NPM_REGISTRY=https://registry.npmmirror.com
+# build-push.sh 已把这个变量透传（见 NPM_REGISTRY）。
+ARG NPM_REGISTRY=""
+RUN npm ci --no-audit --no-fund ${NPM_REGISTRY:+--registry=$NPM_REGISTRY} \
+      --fetch-retries=6 \
+      --fetch-retry-mintimeout=15000 \
+      --fetch-retry-maxtimeout=180000 \
+      --fetch-timeout=600000
 COPY web/ ./
 RUN npm run generate
 
