@@ -113,7 +113,7 @@ ratchet deliver --out /tmp/v --home "$HOME" --client 客户名 \
 | A2 | **没有公网部署** | 客户访问不到控制面 | 服务器 192.168.66.8 上跑起来 + 域名 + TLS |
 | A3 | 日志**轮转语义**未定义 | 归档后重开链会被记成"断流" | 有 `rotation` 声明，合法轮转不误判、改写仍然失败 |
 | A4 | 事件流**全量上传** | 忙的机器上文件持续增长 | 分段上传 + 锚点续接，控制面仍能比对前缀 |
-| A5 | `mcpb` 资产缺失 | 网站 `site.ts` 指向 `0.13.0.mcpb`，一旦重新部署就是 404 | `make release` 产出 mcpb，或用脚本补到 release |
+| A5 | `mcpb` 资产缺失 | ~~网站指向 404~~ **已收口**（2026-09-25）：`desktopBundleUrl` 置空，页面不渲染这个入口 | 把 `dist/ratchet-0.13.0.mcpb` 传到 release 后填回 URL。产物目前打不出来：这台机器拉 GitHub release 附件会被连接重置（`build-mcpb.sh` 实测失败） |
 | A6 | Release 流水线最后一个红灯 | 每次发版都红（**不影响安装**，资产与镜像已发出） | MCP Registry 那步绿 |
 | A7 | 跨组织/联合身份的委派 | 目前按"同组织 + agent 名"解析，跨组织判未知链 | 要么支持，要么在规范里明确排除 |
 | A8 | 控制台不会自动刷新 | 长开需要手动刷新 | 轮询或 SSE，且不打扰阅读 |
@@ -151,9 +151,9 @@ ratchet deliver --out /tmp/v --home "$HOME" --client 客户名 \
 | 容器镜像 | ✅ `asas-api` / `asas-sensor` 在华为 SWR，按 **digest** 钉版本；`values-*.yaml` 已同步 |
 | 本机集群 | ✅ kind `ns=asas`：`asas-api` 1/1 Running，NodePort `8080:30090`，PVC `asas-data` |
 | 控制台地址 | ✅ http://127.0.0.1:30090 （由 `asas-local-gateway` 容器接出来，重启机器仍在） |
-| 服务器部署 | ❌ 未做（192.168.66.8 现在 SSH 都连不上，VPN 掉了） |
+| 服务器部署 | ✅ **已上线**（2026-09-25）：`ratchet-web:0.13.0-4f53541`，滚动发布完成、漂移检查无漂移 |
 | Release 流水线 | ⚠️ 红在最后一步「Publish to the official MCP Registry」；日志要 admin 权限我读不到 |
-| 网站 | ⚠️ 线上页面还是 `0.12.1` 且指向 `ratchet-0.12.1.mcpb`（该资产 404）；仓库里已改到 0.13.0，但**站点没重新部署** |
+| 网站 | ✅ **已重新部署**（2026-09-25）：`https://podcloud.dlszjr.com` 跑的是 `0.13.0-4f53541`。中英双语（`/` 与 `/zh`）、新增执行点营销页 `/guard`；首页不再指向不存在的 mcpb。生产环境实测 8 条路由：对比度 0 处低于 AA、横向溢出 0、小于 24px 的点击目标 0 |
 
 ## 七、风险表
 
@@ -200,8 +200,18 @@ ip route get 1.1.1.1 | head -1                      # 看是不是走了 tun0；
 ## 八、下一步建议（按对"能交付"的影响排序）
 
 1. **A1 认证**——不做这个，server 只能自己用，B1/B3 也都无从谈起。
-2. **A2 服务器部署**——VPN 恢复后 `make deploy-local` 的同构流程 + 域名 + TLS。
-3. **A5 + A6 发布收口**——mcpb 资产 + Registry 那步，让发版全绿（现在每次发版都留一个红叉）。
+2. ~~A2 服务器部署~~ ✅ 已完成（站点侧）。控制面 `asas-api` 仍只有本机 kind，要上服务器另说。
+3. **A5 + A6 发布收口**——A5 已在页面侧收口；mcpb 产物仍缺（拉 GitHub 附件会断，需要在网络好的机器上跑 `scripts/build-mcpb.sh` 再传）。A6 是 Registry 那步。
+
+## 发布侧的两条环境事实（2026-09-25 实测，会反复用到）
+
+1. **从这台机器构建站点镜像必须换 npm 源。** 取 `registry.npmjs.org` 上一个 73KB 的包要
+   **17.18 秒**，一次 `npm ci` 会在某个 tarball 上稳定超时（加满 6 次重试跑到 908 秒仍失败）；
+   换 `registry.npmmirror.com` 同一个包 **0.18 秒**。所以：
+   `NPM_REGISTRY=https://registry.npmmirror.com ./deploy/swr/build-push.sh <tag>`
+   （`build-push.sh` 已透传，`web.Dockerfile` 用 ARG 接收，默认仍是官方源。）
+2. **GitHub release 附件仍然拉不动。** `scripts/build-mcpb.sh` 在 `darwin_arm64` 上
+   `curl: (35) Recv failure: Connection reset by peer`。这和推广档里记的出口问题同源。
 4. **A3 轮转语义**——它挡着"断流能不能直接影响合规判定"。
 5. **执行点的下一步**——B1 已定（走 hook，不做代理）。接着要定的是覆盖到哪：
    只维护 Claude Code、还是再补 Codex 的包装脚本；见 B1 那一行的三个选项。
