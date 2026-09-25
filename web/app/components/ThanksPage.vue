@@ -40,9 +40,9 @@ useHead(() => ({
 
       <p class="mt-12 border-t border-line pt-6 text-[13px] leading-relaxed text-faint">
         {{ th.refundNote1 }}
-        <NuxtLink :to="href('/legal/refund')" class="py-1 text-brand-ink hover:underline">{{ th.refundNoteLink }}</NuxtLink>。
+        <NuxtLink :to="href('/legal/refund')" class="py-1.5 text-brand-ink hover:underline">{{ th.refundNoteLink }}</NuxtLink>。
         {{ th.refundNote2 }}
-        <a :href="site.contactUrl" class="py-1 text-brand-ink hover:underline">{{ site.contactEmail }}</a>
+        <a :href="site.contactUrl" class="py-1.5 text-brand-ink hover:underline">{{ site.contactEmail }}</a>
         {{ th.refundNote3 }}
       </p>
     </main>

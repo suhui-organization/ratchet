@@ -10,21 +10,23 @@ import { copy, type Locale } from '~/site'
  */
 export function useLocale() {
   const route = useRoute()
-  const raw = String((route.params as Record<string, unknown>).lang ?? '')
 
-  // 路径第一段只允许空或 zh。别的值（比如把 /pricing 当成 lang）直接 404，
-  // 而不是默默渲染首页——那会让 /anything 都返回 200，对搜索和安全都是坏信号。
-  if (raw && raw !== 'zh') {
-    throw createError({ statusCode: 404, statusMessage: 'Not found', fatal: true })
-  }
+  // 语言从**路径**判断，而不是从路由参数。
+  //
+  // 为什么：错误页上 route.params 是空的（出错的导航没有解析出参数），
+  // 用参数判断会让 /zh/nope 回落到英文。路径始终在，所以它更可靠。
+  //
+  // 这个函数**不抛错**：它要能在错误页里被调用。非法语言的 404 由中间件
+  // validate-lang 负责（见 app/middleware/）——放在这里会导致错误页自己再抛一次。
+  const onZh = () => route.path === '/zh' || route.path.startsWith('/zh/')
 
-  const locale = computed<Locale>(() => (raw === 'zh' ? 'zh' : 'en'))
+  const locale = computed<Locale>(() => (onZh() ? 'zh' : 'en'))
   const t = computed(() => copy[locale.value])
 
   /** 同一页在另一种语言下的地址。 */
   const altHref = computed(() => {
     const path = route.path
-    if (locale.value === 'en') return path === '/' ? '/zh' : `/zh${path}`
+    if (!onZh()) return path === '/' ? '/zh' : `/zh${path}`
     const stripped = path.replace(/^\/zh/, '')
     return stripped === '' ? '/' : stripped
   })

@@ -34,12 +34,13 @@ export const site = {
    * 而不是给一个点了 404 的链接。一个讲证据的产品，首页上不能有一条
    * 一点就断的承诺。
    *
-   * 2026-09-25：v0.13.0 的 release 里**没有** mcpb 资产（`make dist` 出了四平台
-   * 二进制，但 `scripts/build-mcpb.sh` 没跑成）。所以这里留空。
-   * 把 `dist/ratchet-0.13.0.mcpb` 传到 release 之后，把 URL 填回来即可：
-   *   https://github.com/suhui-organization/ratchet/releases/latest/download/ratchet-0.13.0.mcpb
+   * 2026-09-25：资产已补上并核验过——`scripts/build-mcpb.sh` 打出 4 个平台二进制的包，
+   * 传到 v0.13.0 release，GitHub 记的 digest 与本地 sha256 逐字节一致：
+   *   8079fd0849a2b8f2cb7e3ac5d5a7bc4b8553846c60086685fa2d6ff8a3c6bd70
+   * 直连下载实测 200、12210966 bytes。
    */
-  desktopBundleUrl: '',
+  desktopBundleUrl:
+    'https://github.com/suhui-organization/ratchet/releases/latest/download/ratchet-0.13.0.mcpb',
   /** 无下载地址时的联系入口。 */
   contactUrl: 'mailto:iverson.wuwei@gmail.com?subject=Ratchet%20access',
   /** 页面上显示的联系邮箱（必须与 contactUrl 指向同一个信箱）。 */
@@ -96,6 +97,17 @@ const en = {
     license: 'Apache-2.0',
     year: '© 2026',
     note: 'developer preview — output formats will change',
+  },
+  legal: {
+    updated: 'Last updated',
+    notFound: 'Not found',
+    notFoundBody: 'That document does not exist.',
+  },
+  error: {
+    code: '404',
+    title: 'Not found',
+    body: 'That address does not exist. Nothing was changed on this machine.',
+    home: 'Back to Ratchet',
   },
   home: {
     tagline: {
@@ -565,6 +577,17 @@ const zh: typeof en = {
     license: 'Apache-2.0',
     year: '© 2026',
     note: '开发者预览版，输出格式还会变',
+  },
+  legal: {
+    updated: '最后更新',
+    notFound: '没有这份文档',
+    notFoundBody: '该文档不存在。',
+  },
+  error: {
+    code: '404',
+    title: '没有这个地址',
+    body: '这个地址不存在。这台机器上没有任何东西被改动。',
+    home: '回到 Ratchet',
   },
   home: {
     tagline: {

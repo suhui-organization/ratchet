@@ -170,7 +170,7 @@ useHead(() => ({
              宁可少一个入口，也不给一条点了就断的链接。 -->
         <p v-if="site.desktopBundleUrl" class="mt-5 text-[13px] leading-relaxed text-faint">
           {{ t.home.install.onDesktop }}
-          <a :href="site.desktopBundleUrl" class="py-1 text-brand-ink hover:underline">
+          <a :href="site.desktopBundleUrl" class="py-1.5 text-brand-ink hover:underline">
             {{ t.home.cta.desktop }} ({{ site.version }}, .mcpb)
           </a>
           {{ t.home.install.desktopSuffix }}
