@@ -816,3 +816,12 @@ Claude Desktop 用户下载即装——**不需要 Smithery 做中间人**，还
 
 - **2026-09-26 09:30 档**：第 12 档仍不可达（`x.com`/`old.reddit`/`news.ycombinator` HTTP 000；GitHub 200）。
   本轮 0 条。中断窗口与累计档数已集中记到 `docs/STATUS.md`「渠道可用性」一节（本文件不再逐档重复）。
+
+- **2026-09-26 15:30 档**：**网络开始恢复，但浏览器表面不可用，本轮仍为 0 条。**
+  - 出口自检：`https://x.com` → **HTTP 200（2.9s）**（恢复）；`https://old.reddit.com` → **HTTP 403（2.8s）**
+    （curl 无 UA 的正常响应，说明连接已通）；`https://news.ycombinator.com` → `HTTP 000`；`https://github.com` → `HTTP 000`。
+  - 浏览器：`cua.createBrowserTab("iab", …)` → `Browser is not available: iab`；`cua.getState()` → `browsers: []`；
+    `cua.getTab({url:"https://x.com"}, {browser:"iab"})` → `Error: Browser is not available: iab`。
+    **没有浏览器 = X/Reddit 这两个需要登录态的渠道无法发布**（X 的会话原本只存在于内置浏览器里）。
+  - 因此本轮：X 0 条（网络已通但无浏览器）、Reddit 0 条（同上）、HN 0 条（网络仍不通）。
+  - 需要你做的：**打开 Codex 的内置浏览器**（保持 X / Reddit 登录态），网络那条出口看起来已经在回来了。
