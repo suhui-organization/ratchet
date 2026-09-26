@@ -187,6 +187,7 @@ ratchet deliver --out /tmp/v --home "$HOME" --client 客户名 \
 
 | 渠道 | 状态 | 证据 |
 |---|---|---|
+| （中断窗口） | **2026-09-22 15:30 起中断，至 09-26 09:30 仍未恢复：连续 12 档 0 条** | 每档都以四条自检命令复核；恢复后会自动补跑并在此更新 |
 | X（点对点回复） | ❌ 不可达 | 页面报 `Something went wrong. Try reloading.`；控制台 `x.com/i/api/*` → `HTTP-0 codes:[1004]`；宿主机 `curl https://x.com` → `HTTP 000`（10s 超时） |
 | Reddit（old.reddit.com 路径） | ❌ 不可达 | `curl https://old.reddit.com` → `HTTP 000`；浏览器导航挂住直到工具超时 |
 | HN（评论） | ❌ 不可达 | `curl https://news.ycombinator.com` → `HTTP 000` |
