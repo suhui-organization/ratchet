@@ -829,3 +829,14 @@ Claude Desktop 用户下载即装——**不需要 Smithery 做中间人**，还
 - **2026-09-26 21:30 档**：两个阻塞同时在——**网络回落**（`x.com`/`old.reddit`/`news.ycombinator`/`github.com` 全部 HTTP 000）
   且**内置浏览器仍不可用**（`cua.getState()` → `browsers: []`）。本轮 X/Reddit/HN 均 0 条，无刷量动作。
   待办：①恢复出口 ②打开内置浏览器（保持 X/Reddit 登录态）。
+
+- **2026-09-27 09:30 档**：**网络完全恢复，但内置浏览器仍不可用 → 本轮仍 0 条。**
+  - 出口自检（全部恢复）：`https://x.com` → `HTTP 200 · 8.77s`；`https://old.reddit.com` → `HTTP 403 · 1.83s`；
+    `https://news.ycombinator.com` → `HTTP 200 · 2.32s`；`https://github.com` → `HTTP 200 · 3.38s`。
+  - 浏览器（仍缺）：`cua.getTab({url:"https://x.com"}, {browser:"iab"})` → `Error: Browser is not available: iab`；
+    `cua.createBrowserTab("iab", "https://x.com")` → `Error: Browser is not available: iab`；
+    `cua.getState()` → `browsers: 0`、`apps: 0`。
+  - 影响：X / Reddit / HN 的登录态都只在**内置浏览器**里（外挂 Playwright 浏览器是另一个 profile，
+    未登录任何账号），所以三条渠道全部发不出。本轮 X 0 条、Reddit 0 条、HN 0 条。
+  - **唯一待办：打开 Codex 的内置浏览器**（保持 X = @WaldenWuwei、Reddit = Tight_Programmer1340 登录态）。
+    网络这一侧已经不用再动了。
